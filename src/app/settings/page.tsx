@@ -1,10 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { LandingPage } from '@/components/LandingPage';
+import { Settings } from '@/components/Settings';
 import type { Screen } from '@/App';
 
-export default function Home() {
+export default function SettingsPage() {
   const router = useRouter();
 
   const onNavigate = (screen: Screen) => {
@@ -39,5 +39,5 @@ export default function Home() {
     }
   };
 
-  return <LandingPage onNavigate={onNavigate} />;
+  return <Settings onNavigate={onNavigate} />;
 }
