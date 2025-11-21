@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import type { ComponentType, SVGProps } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Movie, RoomTheme, Screen } from '../App';
+import { Movie, RoomTheme } from '../App';
 
 interface MovieWatchScreenProps {
-  onNavigate: (screen: Screen) => void;
+  onNavigate: (screen: string) => void;
   selectedMovie: Movie | null;
   roomTheme: RoomTheme;
 }
@@ -26,7 +25,7 @@ const reactions = [
 
 interface FloatingReaction {
   id: number;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  icon: React.ComponentType<any>;
   color: string;
   x: number;
 }
@@ -45,7 +44,6 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reactionIdRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const defaultMovie = {
@@ -65,6 +63,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
+    // Fullscreen change listener
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
@@ -117,10 +116,15 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
 
   const toggleFullscreen = async () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      await containerRef.current.requestFullscreen();
-    } else {
-      await document.exitFullscreen();
+
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error('Error toggling fullscreen:', err);
     }
   };
 
@@ -160,13 +164,12 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
     }, 3000);
   };
 
-  const addReaction = (icon: ComponentType<SVGProps<SVGSVGElement>>, color: string) => {
-    const id = ++reactionIdRef.current;
+  const addReaction = (icon: React.ComponentType<any>, color: string) => {
     const newReaction: FloatingReaction = {
-      id,
+      id: Date.now(),
       icon,
       color,
-      x: (id * 37) % 200
+      x: Math.random() * 200
     };
     setFloatingReactions(prev => [...prev, newReaction]);
     setTimeout(() => {
@@ -192,8 +195,9 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
             onClick={togglePlay}
           />
 
-          {/* Top Right Controls and Participants */}
+          {/* Top Right Controls - Always Visible */}
           <div className="absolute top-6 right-6 flex gap-3 items-start z-50">
+            {/* Video Participants */}
             {['SC', 'AM', 'JL'].map((avatar, index) => (
               <motion.div
                 key={index}
@@ -203,7 +207,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
                 className="relative group"
               >
                 <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-white/20 to-white/10 backdrop-blur-xl border border-white/20 overflow-hidden">
-                  <div
+                  <div 
                     className="w-full h-full flex items-center justify-center bg-gradient-to-br"
                     style={{
                       backgroundImage: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
@@ -216,6 +220,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
               </motion.div>
             ))}
 
+            {/* Chat Toggle Button - Always Visible */}
             <motion.button
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -228,6 +233,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
               <span className="text-sm">Chat</span>
             </motion.button>
 
+            {/* Fullscreen Toggle - Always Visible */}
             <motion.button
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -360,8 +366,6 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
                       />
                     </div>
                   </div>
-
-                  
                 </div>
               </motion.div>
             )}
@@ -450,21 +454,27 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
             whileTap={{ scale: 0.95 }}
             onClick={toggleMic}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-              micOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'
+              micOn
+                ? 'bg-white/10 hover:bg-white/20'
+                : 'bg-red-500/20 hover:bg-red-500/30'
             }`}
           >
             {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-red-500" />}
           </motion.button>
+          
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={toggleVideo}
             className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-              videoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'
+              videoOn
+                ? 'bg-white/10 hover:bg-white/20'
+                : 'bg-red-500/20 hover:bg-red-500/30'
             }`}
           >
             {videoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-red-500" />}
           </motion.button>
+          
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}

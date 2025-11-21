@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowLeft, Copy, Check, Users, Play, Video, Mic, MicOff } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -21,6 +21,20 @@ const participants = [
 export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoomProps) {
   const [copied, setCopied] = useState(false);
   const [micOn, setMicOn] = useState(true);
+  const [videoOn, setVideoOn] = useState(true);
+  const [roomType] = useState<'private' | 'public'>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('roomType') : null;
+    return v === 'public' ? 'public' : 'private';
+  });
+  const [adminEnabled] = useState<boolean>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('adminEnabled') : null;
+    return v ? v === 'true' : true;
+  });
+  const [maxParticipants] = useState<number>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('maxParticipants') : null;
+    const n = v ? parseInt(v, 10) : 4;
+    return Math.min(4, Math.max(1, isNaN(n) ? 4 : n));
+  });
 
   const handleCopy = () => {
     setCopied(true);
@@ -59,7 +73,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
               }}
             >
               <Users className="w-4 h-4" style={{ color: roomTheme.primary }} />
-              <span className="text-sm">{participants.filter(p => p.online).length}/{participants.length}</span>
+              <span className="text-sm">{participants.filter(p => p.online).length}/{maxParticipants}</span>
             </div>
           </div>
         </div>
@@ -73,7 +87,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
             className="mb-12 text-center"
           >
             <h1 className="text-4xl mb-3 tracking-tight">Waiting Room</h1>
-            <p className="text-white/60 text-lg">Invite friends to join your session</p>
+            <p className="text-white/60 text-lg">{roomType === 'public' ? 'Public room – anyone can join' : 'Invite friends to join your session'}</p>
           </motion.div>
 
           <div className="grid lg:grid-cols-3 gap-8">
@@ -84,21 +98,32 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
               transition={{ delay: 0.1 }}
               className="lg:col-span-2 space-y-6"
             >
-              {/* Invite Link */}
-              <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
-                <label className="text-sm text-white/60 mb-3 block">Room Invite Link</label>
-                <div className="flex gap-3">
-                  <div className="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60">
-                    connectus.app/room/abc123xyz
+              {roomType === 'private' ? (
+                <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
+                  <label className="text-sm text-white/60 mb-3 block">Room Invite Link</label>
+                  <div className="flex gap-3">
+                    <div className="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60">
+                      connectus.app/room/abc123xyz
+                    </div>
+                    <Button
+                      onClick={handleCopy}
+                      className="px-6 text-white rounded-2xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
+                      }}
+                    >
+                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </Button>
                   </div>
-                  <Button
-                    onClick={handleCopy}
-                    className="px-6 bg-[#695CFF] hover:bg-[#5a4de6] rounded-2xl"
-                  >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </Button>
                 </div>
-              </div>
+              ) : (
+                <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
+                  <div className="flex items-center justify-between">
+                    <p className="text-white/80">Public room – open access</p>
+                    <div className="px-3 py-1 rounded-full text-xs border" style={{ borderColor: `${roomTheme.primary}60` }}>No invite needed</div>
+                  </div>
+                </div>
+              )}
 
               {/* Participants Grid */}
               <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
@@ -144,20 +169,24 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
                   >
                     {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                   </button>
-                  <button className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
-                    <Video className="w-5 h-5" />
+                  <button
+                    onClick={() => setVideoOn(!videoOn)}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${videoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'}`}
+                  >
+                    {videoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                   </button>
                 </div>
 
                 <Button
                   onClick={() => onNavigate('watch')}
-                  className="text-white rounded-full px-8 gap-2"
+                  disabled={!adminEnabled}
+                  className="text-white rounded-full px-8 gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
                   }}
                 >
                   <Play className="w-4 h-4" />
-                  Start Session
+                  {adminEnabled ? 'Start Session' : 'Admin disabled'}
                 </Button>
               </div>
             </motion.div>
@@ -196,6 +225,9 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
                     <span className="text-white/60">Genre</span>
                     <span>{movie.genre}</span>
                   </div>
+                  {participants.filter(p => p.online).length >= maxParticipants && (
+                    <div className="mt-3 text-xs text-red-400">Room is at capacity ({maxParticipants})</div>
+                  )}
                 </div>
               </div>
             </motion.div>

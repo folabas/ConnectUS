@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Users, Lock, Globe, Calendar, Clock, ChevronLeft, ChevronRight, Palette } from 'lucide-react';
+import { ArrowLeft, Users, Lock, Globe, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -82,6 +82,23 @@ const themes: RoomTheme[] = [
 export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme, onThemeChange }: CreateRoomProps) {
   const [currentMovie, setCurrentMovie] = useState(selectedMovie || allMovies[0]);
   const currentIndex = allMovies.findIndex(m => m.id === currentMovie.id);
+  const [roomType, setRoomType] = useState<'private' | 'public'>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('roomType') : null;
+    return v === 'public' ? 'public' : 'private';
+  });
+  const [adminEnabled, setAdminEnabled] = useState<boolean>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('adminEnabled') : null;
+    return v ? v === 'true' : true;
+  });
+  const [startTime, setStartTime] = useState<string>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('startTime') : null;
+    return v || '';
+  });
+  const [maxParticipants, setMaxParticipants] = useState<number>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('maxParticipants') : null;
+    const n = v ? parseInt(v, 10) : 4;
+    return Math.min(4, Math.max(1, isNaN(n) ? 4 : n));
+  });
 
   const handlePrevMovie = () => {
     const prevIndex = currentIndex > 0 ? currentIndex - 1 : allMovies.length - 1;
@@ -137,11 +154,47 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
               <div>
                 <label className="text-sm text-white/60 mb-2 block">Privacy</label>
                 <div className="grid grid-cols-2 gap-3">
-                  <button className="h-14 rounded-2xl bg-[#695CFF] border border-[#695CFF] flex items-center justify-center gap-2 transition-all">
+                  <button
+                    onClick={() => {
+                      setRoomType('private');
+                      if (typeof window !== 'undefined') localStorage.setItem('roomType', 'private');
+                    }}
+                    className={`h-14 rounded-2xl flex items-center justify-center gap-2 transition-all ${
+                      roomType === 'private' ? 'text-white' : 'hover:bg-white/10 text-white'
+                    }`}
+                    style={{
+                      background:
+                        roomType === 'private'
+                          ? `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
+                          : 'rgba(255,255,255,0.05)',
+                      borderColor:
+                        roomType === 'private' ? roomTheme.primary : 'rgba(255,255,255,0.1)',
+                      borderWidth: 1,
+                      borderStyle: 'solid'
+                    }}
+                  >
                     <Lock className="w-4 h-4" />
                     Private
                   </button>
-                  <button className="h-14 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 flex items-center justify-center gap-2 transition-all">
+                  <button
+                    onClick={() => {
+                      setRoomType('public');
+                      if (typeof window !== 'undefined') localStorage.setItem('roomType', 'public');
+                    }}
+                    className={`h-14 rounded-2xl flex items-center justify-center gap-2 transition-all ${
+                      roomType === 'public' ? 'text-white' : 'hover:bg-white/10 text-white'
+                    }`}
+                    style={{
+                      background:
+                        roomType === 'public'
+                          ? `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
+                          : 'rgba(255,255,255,0.05)',
+                      borderColor:
+                        roomType === 'public' ? roomTheme.primary : 'rgba(255,255,255,0.1)',
+                      borderWidth: 1,
+                      borderStyle: 'solid'
+                    }}
+                  >
                     <Globe className="w-4 h-4" />
                     Public
                   </button>
@@ -173,21 +226,18 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
 
               <div>
                 <label className="text-sm text-white/60 mb-2 block">Start Time (Optional)</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
-                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                    <Input
-                      type="date"
-                      className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white focus:border-[#695CFF] focus:bg-white/10"
-                    />
-                  </div>
-                  <div className="relative">
-                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                    <Input
-                      type="time"
-                      className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white focus:border-[#695CFF] focus:bg-white/10"
-                    />
-                  </div>
+                <div className="relative">
+                  <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                  <Input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => {
+                      setStartTime(e.target.value);
+                      if (typeof window !== 'undefined') localStorage.setItem('startTime', e.target.value);
+                    }}
+                    className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                  />
+                  <p className="mt-2 text-xs text-white/40">Time uses your local timezone</p>
                 </div>
               </div>
 
@@ -197,15 +247,47 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                   <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                   <Input
                     type="number"
-                    placeholder="8"
+                    min={1}
+                    max={4}
+                    value={maxParticipants}
+                    onChange={(e) => {
+                      const n = Math.min(4, Math.max(1, parseInt(e.target.value || '0', 10)));
+                      setMaxParticipants(n);
+                      if (typeof window !== 'undefined') localStorage.setItem('maxParticipants', String(n));
+                    }}
                     className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                  />
+                  <p className="mt-2 text-xs text-white/40">Limit enforced to 4 participants</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-white/60 mb-2 block">Admin Controls</label>
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <span className="text-sm text-white/80">Enable admin-only room management</span>
+                  <input
+                    type="checkbox"
+                    checked={adminEnabled}
+                    onChange={(e) => {
+                      setAdminEnabled(e.target.checked);
+                      if (typeof window !== 'undefined') localStorage.setItem('adminEnabled', String(e.target.checked));
+                    }}
+                    className="w-5 h-5"
                   />
                 </div>
               </div>
             </div>
 
             <Button
-              onClick={() => onNavigate('waiting-room')}
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('roomType', roomType);
+                  localStorage.setItem('adminEnabled', String(adminEnabled));
+                  localStorage.setItem('maxParticipants', String(maxParticipants));
+                  if (startTime) localStorage.setItem('startTime', startTime);
+                }
+                onNavigate('waiting-room');
+              }}
               className="w-full h-14 text-white rounded-2xl"
               style={{
                 background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
