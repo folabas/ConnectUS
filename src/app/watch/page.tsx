@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MovieWatchScreen } from '@/components/MovieWatchScreen';
-import type { Movie, RoomTheme, Screen } from '@/App';
+import type { Movie, RoomTheme, Screen, Room } from '@/App';
+import { roomApi, tokenStorage } from '@/services/api';
 
 export default function WatchPage() {
   const router = useRouter();
@@ -15,6 +16,28 @@ export default function WatchPage() {
     const t = typeof window !== 'undefined' ? localStorage.getItem('roomTheme') : null;
     return t ? JSON.parse(t) : null;
   });
+  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
+
+  useEffect(() => {
+    const fetchRoom = async () => {
+      const storedRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
+      if (!storedRoomId) return;
+
+      const token = tokenStorage.get();
+      if (!token) return;
+
+      try {
+        const response = await roomApi.getById(token, storedRoomId);
+        if (response.success && response.data) {
+          setCurrentRoom(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching room:', error);
+      }
+    };
+
+    fetchRoom();
+  }, []);
 
   const onNavigate = (screen: Screen) => {
     switch (screen) {
@@ -53,6 +76,7 @@ export default function WatchPage() {
       onNavigate={onNavigate}
       selectedMovie={selectedMovie}
       roomTheme={roomTheme || { primary: '#695CFF', secondary: '#8B7FFF', name: 'Purple Dream' }}
+      currentRoom={currentRoom}
     />
   );
 }
