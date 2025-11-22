@@ -30,9 +30,15 @@ const io = new Server(httpServer, {
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+        "http://localhost:3000",
+        "https://connectus.live",
+        "https://www.connectus.live"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
 }));
+app.options("*", cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
