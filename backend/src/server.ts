@@ -32,6 +32,21 @@ const io = new Server(httpServer, {
     }
 });
 
+// Global CORS Handler - MUST be FIRST to handle OPTIONS preflight
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    // Stop OPTIONS early
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(200);
+    }
+
+    next();
+});
+
 // Middleware
 app.use(cors({
     origin: [
@@ -39,7 +54,7 @@ app.use(cors({
         "https://connectus.live",
         "https://www.connectus.live"
     ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
 }));
 app.options("*", cors());
