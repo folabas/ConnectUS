@@ -11,26 +11,44 @@ import { JoinRoom } from './components/JoinRoom';
 
 export type Screen = 'landing' | 'auth' | 'library' | 'create-room' | 'join-room' | 'waiting-room' | 'watch' | 'profile' | 'settings';
 
-export interface Movie {
-  id: number;
-  title: string;
-  image: string;
-  duration: string;
-  rating: string;
-  genre: string;
-  videoUrl?: string;
-}
-
 export interface RoomTheme {
   primary: string;
   secondary: string;
   name: string;
 }
 
+
+export interface Movie {
+  id: string;
+  title: string;
+  image: string;
+  duration: string;
+  rating: string;
+  genre: string;
+  videoUrl?: string;
+  muxPlaybackId?: string;
+}
+
+export interface Room {
+  _id: string;
+  name: string;
+  host: any;
+  movie: any;
+  type: 'public' | 'private';
+  code?: string;
+  theme: RoomTheme;
+  startTime?: string;
+  maxParticipants: number;
+  adminEnabled: boolean;
+  participants: any[];
+  status: 'waiting' | 'playing' | 'finished';
+}
+
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('landing');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
   const [roomTheme, setRoomTheme] = useState<RoomTheme>({
     primary: '#695CFF',
     secondary: '#8B7FFF',
@@ -63,9 +81,9 @@ export default function App() {
       case 'join-room':
         return <JoinRoom onNavigate={navigate} />;
       case 'waiting-room':
-        return <WaitingRoom onNavigate={navigate} selectedMovie={selectedMovie} roomTheme={roomTheme} />;
+        return <WaitingRoom onNavigate={navigate} selectedMovie={selectedMovie} roomTheme={roomTheme} onRoomUpdate={setCurrentRoom} />;
       case 'watch':
-        return <MovieWatchScreen onNavigate={navigate} selectedMovie={selectedMovie} roomTheme={roomTheme} />;
+        return <MovieWatchScreen onNavigate={navigate} selectedMovie={selectedMovie} roomTheme={roomTheme} currentRoom={currentRoom} />;
       case 'profile':
         return <Profile onNavigate={navigate} />;
       case 'settings':

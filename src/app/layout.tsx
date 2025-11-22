@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "ConnectUs - Watch Movies Together",
   description: "Stream movies in perfect sync with friends. Real-time chat, reactions, and video calls — all in one beautiful platform.",
   keywords: "movies, streaming, watch together, sync, video chat, social",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

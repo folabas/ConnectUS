@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Plus, Video, User, Settings as SettingsIcon, Users } from 'lucide-react';
+import { Search, Plus, Video, User, Settings as SettingsIcon, Users, Loader2, Upload } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Movie, Screen } from '../App';
+import { movieApi } from '@/services/api';
+import { toast } from 'sonner';
+import { UploadMovieModal } from './UploadMovieModal';
+import { FriendsSidebar } from './FriendsSidebar';
+
 
 interface MovieLibraryProps {
   onNavigate: (screen: Screen) => void;
@@ -13,72 +18,50 @@ interface MovieLibraryProps {
 
 const categories = ['All', 'Action', 'Drama', 'Sci-Fi', 'Comedy', 'Thriller'];
 
-const movies: Movie[] = [
-  {
-    id: 1,
-    title: 'Quantum Horizon',
-    image: 'https://images.unsplash.com/photo-1655367574486-f63675dd69eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGNpbmVtYXxlbnwxfHx8fDE3NjMzODE5NTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '2h 15m',
-    rating: '8.5',
-    genre: 'Sci-Fi',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-  },
-  {
-    id: 2,
-    title: 'Dark Velocity',
-    image: 'https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhY3Rpb24lMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NjMzNDU0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '2h 05m',
-    rating: '8.2',
-    genre: 'Action',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'
-  },
-  {
-    id: 3,
-    title: 'Nebula Dreams',
-    image: 'https://images.unsplash.com/photo-1661115111405-981a08256178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2lmaSUyMG1vdmllJTIwcG9zdGVyfGVufDF8fHx8MTc2MzQyMTgwOXww&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '1h 58m',
-    rating: '8.8',
-    genre: 'Sci-Fi',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-  },
-  {
-    id: 4,
-    title: 'Silent Echo',
-    image: 'https://images.unsplash.com/photo-1655367574486-f63675dd69eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGNpbmVtYXxlbnwxfHx8fDE3NjMzODE5NTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '2h 10m',
-    rating: '8.4',
-    genre: 'Drama',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4'
-  },
-  {
-    id: 5,
-    title: 'The Last Circuit',
-    image: 'https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhY3Rpb24lMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NjMzNDU0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '2h 22m',
-    rating: '8.6',
-    genre: 'Thriller',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
-  },
-  {
-    id: 6,
-    title: 'Cosmic Laughter',
-    image: 'https://images.unsplash.com/photo-1587042285747-583b4d4d73b7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21lZHklMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NjMzNDU3NzR8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '1h 45m',
-    rating: '7.9',
-    genre: 'Comedy',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4'
-  }
-];
-
 export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [movies, setMovies] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [friendsSidebarOpen, setFriendsSidebarOpen] = useState(false);
 
-  const filteredMovies = movies.filter(movie => {
-    const matchesCategory = selectedCategory === 'All' || movie.genre === selectedCategory;
-    const matchesSearch = movie.title.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+
+  const fetchMovies = async () => {
+    setLoading(true);
+    try {
+      const response = await movieApi.getAll({
+        genre: selectedCategory,
+        search: searchQuery
+      });
+
+      if (response.success && response.data) {
+        const mappedMovies = response.data.map((m: any) => ({
+          id: m._id, // Use MongoDB _id
+          title: m.title,
+          image: m.image,
+          duration: m.duration,
+          rating: m.rating,
+          genre: m.genre,
+          videoUrl: m.videoUrl
+        }));
+        setMovies(mappedMovies);
+      }
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+      toast.error('Failed to load movies');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchMovies();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedCategory, searchQuery]);
 
   const handleMovieClick = (movie: Movie) => {
     onMovieSelect(movie);
@@ -95,7 +78,7 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
           </div>
           <span className="text-xl tracking-tight">ConnectUs</span>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Button
             onClick={() => onNavigate('join-room')}
@@ -105,7 +88,22 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
             <Users className="w-4 h-4" />
             Join Room
           </Button>
-          
+          <Button
+            onClick={() => setFriendsSidebarOpen(true)}
+            className="bg-white/10 hover:bg-white/20 text-white rounded-full px-4 h-10"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Friends
+          </Button>
+
+          <Button
+            onClick={() => setUploadModalOpen(true)}
+            className="px-4 py-2 rounded-full bg-gradient-to-r from-[#695CFF] to-[#8B7FFF] text-white flex items-center gap-2 hover:opacity-90 transition-opacity"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Movie
+          </Button>
+
           <Button
             onClick={() => onNavigate('create-room')}
             className="bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-full gap-2"
@@ -113,14 +111,14 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
             <Plus className="w-4 h-4" />
             Create Room
           </Button>
-          
+
           <button
             onClick={() => onNavigate('profile')}
             className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
           >
             <User className="w-5 h-5" />
           </button>
-          
+
           <button
             onClick={() => onNavigate('settings')}
             className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
@@ -170,11 +168,10 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
               <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className={`px-6 py-3 rounded-full whitespace-nowrap transition-all ${
-                  selectedCategory === category
-                    ? 'bg-[#695CFF] text-white'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                }`}
+                className={`px-6 py-3 rounded-full whitespace-nowrap transition-all ${selectedCategory === category
+                  ? 'bg-[#695CFF] text-white'
+                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                  }`}
               >
                 {category}
               </button>
@@ -182,52 +179,76 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
           </motion.div>
 
           {/* Movie Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredMovies.map((movie, index) => (
-              <motion.div
-                key={movie.id}
-                initial={{ y: 40, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: index * 0.05 }}
-                onClick={() => handleMovieClick(movie)}
-                className="group cursor-pointer"
-              >
-                <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-4 bg-white/5">
-                  <ImageWithFallback
-                    src={movie.image}
-                    alt={movie.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="absolute bottom-0 left-0 right-0 p-5">
-                      <div className="flex items-center gap-2 text-sm text-white/80 mb-2">
-                        <span>{movie.duration}</span>
-                        <span>•</span>
-                        <span>★ {movie.rating}</span>
+          {loading ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="w-10 h-10 animate-spin text-[#695CFF]" />
+            </div>
+          ) : movies.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {movies.map((movie, index) => (
+                <motion.div
+                  key={movie.id}
+                  initial={{ y: 40, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: index * 0.05 }}
+                  onClick={() => handleMovieClick(movie)}
+                  className="group cursor-pointer"
+                >
+                  <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-4 bg-white/5">
+                    <ImageWithFallback
+                      src={movie.image}
+                      alt={movie.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+
+                    {/* Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute bottom-0 left-0 right-0 p-5">
+                        <div className="flex items-center gap-2 text-sm text-white/80 mb-2">
+                          <span>{movie.duration}</span>
+                          <span>•</span>
+                          <span>★ {movie.rating}</span>
+                        </div>
+                        <Button className="w-full bg-white text-black hover:bg-white/90 rounded-full">
+                          Select Movie
+                        </Button>
                       </div>
-                      <Button className="w-full bg-white text-black hover:bg-white/90 rounded-full">
-                        Select Movie
-                      </Button>
+                    </div>
+
+                    {/* Rating Badge */}
+                    <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/20 text-sm">
+                      ★ {movie.rating}
                     </div>
                   </div>
 
-                  {/* Rating Badge */}
-                  <div className="absolute top-3 right-3 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/20 text-sm">
-                    ★ {movie.rating}
-                  </div>
-                </div>
-                
-                <h3 className="tracking-tight group-hover:text-[#695CFF] transition-colors">
-                  {movie.title}
-                </h3>
-                <p className="text-sm text-white/50">{movie.duration}</p>
-              </motion.div>
-            ))}
-          </div>
+                  <h3 className="tracking-tight group-hover:text-[#695CFF] transition-colors">
+                    {movie.title}
+                  </h3>
+                  <p className="text-sm text-white/50">{movie.duration}</p>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-20 text-white/40">
+              <p className="text-xl">No movies found</p>
+              <p className="text-sm mt-2">Try adjusting your search or category</p>
+            </div>
+          )}
         </div>
       </div>
+
+      <UploadMovieModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={() => {
+          fetchMovies();
+          setUploadModalOpen(false);
+        }}
+      />
+      <FriendsSidebar
+        isOpen={friendsSidebarOpen}
+        onClose={() => setFriendsSidebarOpen(false)}
+      />
     </div>
   );
 }

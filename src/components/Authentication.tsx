@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { Video, Mail, Lock, User, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { toast } from 'sonner';
+import { authApi, tokenStorage, userStorage } from '../services/api';
 
 import { Screen } from '../App';
 
@@ -13,13 +15,85 @@ interface AuthenticationProps {
 
 export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      if (isLogin) {
+        // Login
+        const response = await authApi.login({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (response.success && response.data) {
+          // Store token and user data
+          tokenStorage.set(response.data.token);
+          userStorage.set({
+            userId: response.data.userId,
+            email: response.data.email,
+            fullName: response.data.fullName,
+            avatarUrl: response.data.avatarUrl,
+          });
+
+          toast.success('Welcome back!');
+          onAuth();
+        } else {
+          toast.error(response.message || 'Login failed');
+        }
+      } else {
+        // Register
+        const response = await authApi.register({
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
+        });
+
+        if (response.success && response.data) {
+          // Store token and user data
+          tokenStorage.set(response.data.token);
+          userStorage.set({
+            userId: response.data.userId,
+            email: response.data.email,
+            fullName: response.data.fullName,
+            avatarUrl: response.data.avatarUrl,
+          });
+
+          toast.success('Account created successfully!');
+          onAuth();
+        } else {
+          toast.error(response.message || 'Registration failed');
+        }
+      }
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white flex">
       {/* Left Side - Illustration */}
       <div className="hidden lg:flex lg:flex-1 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#695CFF] via-[#8B7FFF] to-[#5a4de6]" />
-        
+
         <div className="relative z-10 flex items-center justify-center w-full p-16">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
@@ -72,26 +146,35 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                 <Input
                   type="text"
+                  name="fullName"
                   placeholder="Full name"
+                  value={formData.fullName}
+                  onChange={handleInputChange}
                   className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
                 />
               </div>
             )}
-            
+
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
               <Input
                 type="email"
+                name="email"
                 placeholder="Email address"
+                value={formData.email}
+                onChange={handleInputChange}
                 className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
               />
             </div>
-            
+
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
               <Input
                 type="password"
+                name="password"
                 placeholder="Password"
+                value={formData.password}
+                onChange={handleInputChange}
                 className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
               />
             </div>
@@ -106,10 +189,11 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
           </div>
 
           <Button
-            onClick={onAuth}
-            className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl mb-4"
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLogin ? 'Sign In' : 'Create Account'}
+            {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
           </Button>
 
           <div className="relative my-8">

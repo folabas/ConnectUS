@@ -30,21 +30,21 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </div>
           <span className="text-xl tracking-tight">ConnectUs</span>
         </div>
-        
+
         <div className="flex items-center gap-6">
-          <button 
+          <button
             onClick={() => scrollToSection('features')}
             className="text-white/60 hover:text-white transition-colors"
           >
             Features
           </button>
-          <button 
+          <button
             onClick={() => scrollToSection('how-it-works')}
             className="text-white/60 hover:text-white transition-colors"
           >
             How it works
           </button>
-          <button 
+          <button
             onClick={() => scrollToSection('pricing')}
             className="text-white/60 hover:text-white transition-colors"
           >
@@ -74,7 +74,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <Sparkles className="w-4 h-4 text-[#695CFF]" />
                 <span className="text-sm text-white/80">Watch together, anywhere</span>
               </div>
-              
+
               <h1 className="text-7xl leading-[1.1] tracking-tight">
                 Movie nights,
                 <br />
@@ -82,11 +82,11 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   together
                 </span>
               </h1>
-              
+
               <p className="text-xl text-white/60 leading-relaxed max-w-md">
                 Stream movies in perfect sync with friends. Real-time chat, reactions, and video calls — all in one beautiful platform.
               </p>
-              
+
               <div className="flex items-center gap-4">
                 <Button
                   onClick={() => onNavigate('auth')}
@@ -289,11 +289,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className={`p-8 rounded-3xl border transition-all ${
-                  plan.featured
+                className={`p-8 rounded-3xl border transition-all ${plan.featured
                     ? 'bg-gradient-to-br from-[#695CFF]/20 to-[#8B7FFF]/10 border-[#695CFF] scale-105'
                     : 'bg-white/5 border-white/10 hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <h3 className="text-2xl mb-2">{plan.name}</h3>
                 <div className="mb-6">
@@ -310,11 +309,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </ul>
                 <Button
                   onClick={() => onNavigate('auth')}
-                  className={`w-full rounded-2xl ${
-                    plan.featured
+                  className={`w-full rounded-2xl ${plan.featured
                       ? 'bg-[#695CFF] hover:bg-[#5a4de6] text-white'
                       : 'bg-white/10 hover:bg-white/20 text-white'
-                  }`}
+                    }`}
                 >
                   Get Started
                 </Button>
