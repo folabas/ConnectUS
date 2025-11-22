@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Plus, Video, User, Settings as SettingsIcon, Users, Loader2 } from 'lucide-react';
+import { Search, Plus, Video, User, Settings as SettingsIcon, Users, Loader2, Upload } from 'lucide-react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Movie, Screen } from '../App';
 import { movieApi } from '@/services/api';
 import { toast } from 'sonner';
+import { UploadMovieModal } from './UploadMovieModal';
 
 interface MovieLibraryProps {
   onNavigate: (screen: Screen) => void;
@@ -20,39 +21,37 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+
+  const fetchMovies = async () => {
+    setLoading(true);
+    try {
+      const response = await movieApi.getAll({
+        genre: selectedCategory,
+        search: searchQuery
+      });
+
+      if (response.success && response.data) {
+        const mappedMovies = response.data.map((m: any) => ({
+          id: m._id, // Use MongoDB _id
+          title: m.title,
+          image: m.image,
+          duration: m.duration,
+          rating: m.rating,
+          genre: m.genre,
+          videoUrl: m.videoUrl
+        }));
+        setMovies(mappedMovies);
+      }
+    } catch (error) {
+      console.error('Error fetching movies:', error);
+      toast.error('Failed to load movies');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchMovies = async () => {
-      setLoading(true);
-      try {
-        const response = await movieApi.getAll({
-          genre: selectedCategory,
-          search: searchQuery
-        });
-
-        if (response.success && response.data) {
-          // Transform backend data to match frontend Movie interface if needed
-          // Currently they match closely enough, but we need to ensure ID is handled correctly
-          const mappedMovies = response.data.map((m: any) => ({
-            id: m._id, // Use MongoDB _id
-            title: m.title,
-            image: m.image,
-            duration: m.duration,
-            rating: m.rating,
-            genre: m.genre,
-            videoUrl: m.videoUrl
-          }));
-          setMovies(mappedMovies);
-        }
-      } catch (error) {
-        console.error('Error fetching movies:', error);
-        toast.error('Failed to load movies');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    // Debounce search
     const timeoutId = setTimeout(() => {
       fetchMovies();
     }, 300);
@@ -84,6 +83,14 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
           >
             <Users className="w-4 h-4" />
             Join Room
+          </Button>
+
+          <Button
+            onClick={() => setUploadModalOpen(true)}
+            className="px-4 py-2 rounded-full bg-gradient-to-r from-[#695CFF] to-[#8B7FFF] text-white flex items-center gap-2 hover:opacity-90 transition-opacity"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Movie
           </Button>
 
           <Button
@@ -218,6 +225,15 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
           )}
         </div>
       </div>
+
+      <UploadMovieModal
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={() => {
+          fetchMovies();
+          setUploadModalOpen(false);
+        }}
+      />
     </div>
   );
 }

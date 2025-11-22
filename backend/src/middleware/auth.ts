@@ -37,3 +37,7 @@ export const authMiddleware = (
         });
     }
 };
+
+// Alias for consistency with common naming conventions
+export const protect = authMiddleware;
+

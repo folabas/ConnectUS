@@ -8,6 +8,7 @@ export interface IMovie extends Document {
     genre: string;
     videoUrl: string;
     muxPlaybackId?: string;
+    muxAssetId?: string;
     description?: string;
     year?: number;
     createdAt: Date;
@@ -43,6 +44,9 @@ const movieSchema = new Schema<IMovie>(
             required: [true, 'Video URL is required'],
         },
         muxPlaybackId: {
+            type: String,
+        },
+        muxAssetId: {
             type: String,
         },
         description: {

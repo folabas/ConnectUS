@@ -18,19 +18,16 @@ interface UserData {
   fullName?: string;
   avatarUrl?: string;
   createdAt?: string;
+  sessionsHosted?: number;
+  moviesWatched?: number;
+  hoursWatched?: number;
+  watchHistory?: {
+    movieId: string;
+    title: string;
+    date: string;
+    rating: number;
+  }[];
 }
-
-const watchHistory = [
-  { id: 1, title: 'Quantum Horizon', date: 'Nov 15, 2025', rating: 5 },
-  { id: 2, title: 'Dark Velocity', date: 'Nov 10, 2025', rating: 4 },
-  { id: 3, title: 'Nebula Dreams', date: 'Nov 5, 2025', rating: 5 }
-];
-
-const stats = [
-  { label: 'Movies Watched', value: '47', icon: Film },
-  { label: 'Sessions Hosted', value: '23', icon: Users },
-  { label: 'Hours Watched', value: '156', icon: Calendar }
-];
 
 export function Profile({ onNavigate }: ProfileProps) {
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -98,6 +95,12 @@ export function Profile({ onNavigate }: ProfileProps) {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   };
+
+  const stats = [
+    { label: 'Movies Watched', value: userData?.moviesWatched?.toString() || '0', icon: Film },
+    { label: 'Sessions Hosted', value: userData?.sessionsHosted?.toString() || '0', icon: Users },
+    { label: 'Hours Watched', value: userData?.hoursWatched?.toString() || '0', icon: Calendar }
+  ];
 
   if (loading) {
     return (
@@ -203,37 +206,43 @@ export function Profile({ onNavigate }: ProfileProps) {
             <h2 className="text-2xl mb-6 tracking-tight">Recent Watch History</h2>
 
             <div className="space-y-4">
-              {watchHistory.map((movie, index) => (
-                <motion.div
-                  key={movie.id}
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.4 + index * 0.1 }}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center">
-                      <Film className="w-6 h-6" />
+              {(!userData?.watchHistory || userData.watchHistory.length === 0) ? (
+                <div className="text-center text-white/40 py-8">
+                  No watch history yet. Join a room to start watching!
+                </div>
+              ) : (
+                userData.watchHistory.slice().reverse().map((movie, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.4 + index * 0.1 }}
+                    className="flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center">
+                        <Film className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="mb-1">{movie.title}</h3>
+                        <p className="text-sm text-white/60">{new Date(movie.date).toLocaleDateString()}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="mb-1">{movie.title}</h3>
-                      <p className="text-sm text-white/60">{movie.date}</p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${i < movie.rating
-                          ? 'fill-[#695CFF] text-[#695CFF]'
-                          : 'text-white/20'
-                          }`}
-                      />
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${i < (movie.rating || 0)
+                            ? 'fill-[#695CFF] text-[#695CFF]'
+                            : 'text-white/20'
+                            }`}
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                ))
+              )}
             </div>
           </motion.div>
         </div>

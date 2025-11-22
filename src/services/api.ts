@@ -138,6 +138,7 @@ export const authApi = {
 };
 
 // Movie API Service
+// Movie API Service
 export const movieApi = {
     // Get all movies with optional filters
     getAll: async (params?: { genre?: string; search?: string }): Promise<ApiResponse<any[]>> => {
@@ -162,6 +163,87 @@ export const movieApi = {
             headers: {
                 'Content-Type': 'application/json',
             },
+        });
+
+        return response.json();
+    },
+
+    // Create upload URL for Direct Upload
+    createUploadUrl: async (token: string): Promise<ApiResponse<{ uploadUrl: string; assetId: string; uploadId: string }>> => {
+        const response = await fetch(`${API_URL}/api/movies/upload-url`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        return response.json();
+    },
+
+    // Get upload details
+    getUploadDetails: async (token: string, uploadId: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/movies/upload/${uploadId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Upload video file to Mux
+    uploadToMux: async (uploadUrl: string, file: File, onProgress?: (progress: number) => void): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable && onProgress) {
+                    const progress = (e.loaded / e.total) * 100;
+                    onProgress(progress);
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                reject(new Error('Upload failed'));
+            });
+
+            xhr.open('PUT', uploadUrl);
+            xhr.send(file);
+        });
+    },
+
+    // Get asset details from Mux
+    getAssetDetails: async (token: string, assetId: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/movies/asset/${assetId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        return response.json();
+    },
+
+    // Create movie in database
+    create: async (token: string, data: any): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/movies`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(data),
         });
 
         return response.json();

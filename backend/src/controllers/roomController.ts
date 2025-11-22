@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Room } from '../models/Room';
+import { User } from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import crypto from 'crypto';
 
@@ -43,6 +44,9 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
             adminEnabled,
             participants: [userId as any], // Host is automatically a participant
         });
+
+        // Increment sessions hosted
+        await User.findByIdAndUpdate(userId, { $inc: { sessionsHosted: 1 } });
 
         res.status(201).json({
             success: true,
@@ -129,9 +133,9 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
         let room;
 
         if (roomId) {
-            room = await Room.findById(roomId);
+            room = await Room.findById(roomId).populate('movie');
         } else if (code) {
-            room = await Room.findOne({ code: code.toUpperCase() });
+            room = await Room.findOne({ code: code.toUpperCase() }).populate('movie');
         }
 
         if (!room) {
@@ -160,6 +164,22 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
         if (!isParticipant) {
             room.participants.push(userId as any);
             await room.save();
+
+            // Update user stats
+            const movieTitle = (room.movie as any)?.title || 'Unknown Movie';
+            const movieId = (room.movie as any)?._id || room.movie;
+
+            await User.findByIdAndUpdate(userId, {
+                $inc: { moviesWatched: 1 },
+                $push: {
+                    watchHistory: {
+                        movieId: movieId,
+                        title: movieTitle,
+                        date: new Date(),
+                        rating: 0 // Default rating
+                    }
+                }
+            });
         }
 
         res.status(200).json({

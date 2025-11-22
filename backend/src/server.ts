@@ -1,6 +1,8 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import { connectDB } from './config/database';
 import authRoutes from './routes/authRoutes';
 import movieRoutes from './routes/movieRoutes';
@@ -11,6 +13,16 @@ dotenv.config();
 
 // Create Express app
 const app: Application = express();
+const httpServer = createServer(app);
+
+// Initialize Socket.io
+const io = new Server(httpServer, {
+    cors: {
+        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        methods: ['GET', 'POST'],
+        credentials: true
+    }
+});
 
 // Middleware
 app.use(cors({
@@ -19,6 +31,37 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Socket.io Signaling Logic
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+
+    socket.on('join-room', (roomId: string, userId: string) => {
+        socket.join(roomId);
+        socket.to(roomId).emit('user-connected', userId);
+        console.log(`User ${userId} joined room ${roomId}`);
+
+        socket.on('disconnect', () => {
+            socket.to(roomId).emit('user-disconnected', userId);
+        });
+    });
+
+    socket.on('offer', (payload) => {
+        io.to(payload.target).emit('offer', payload);
+    });
+
+    socket.on('answer', (payload) => {
+        io.to(payload.target).emit('answer', payload);
+    });
+
+    socket.on('ice-candidate', (payload) => {
+        io.to(payload.target).emit('ice-candidate', payload);
+    });
+
+    socket.on('chat-message', (payload) => {
+        io.to(payload.roomId).emit('chat-message', payload);
+    });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -60,10 +103,11 @@ const startServer = async () => {
         await connectDB();
 
         // Start listening
-        app.listen(PORT, () => {
+        httpServer.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
             console.log(`📍 API URL: http://localhost:${PORT}`);
             console.log(`🏥 Health check: http://localhost:${PORT}/api/health`);
+            console.log(`🔌 Socket.io ready`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);

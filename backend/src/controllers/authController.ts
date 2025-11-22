@@ -152,6 +152,10 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
                 fullName: user.fullName,
                 avatarUrl: user.avatarUrl,
                 createdAt: user.createdAt,
+                sessionsHosted: user.sessionsHosted,
+                moviesWatched: user.moviesWatched,
+                hoursWatched: user.hoursWatched,
+                watchHistory: user.watchHistory,
             },
         });
     } catch (error: any) {

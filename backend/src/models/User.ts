@@ -6,6 +6,15 @@ export interface IUser extends Document {
     password: string;
     fullName?: string;
     avatarUrl?: string;
+    sessionsHosted: number;
+    moviesWatched: number;
+    hoursWatched: number;
+    watchHistory: {
+        movieId: mongoose.Types.ObjectId;
+        title: string;
+        date: Date;
+        rating: number;
+    }[];
     createdAt: Date;
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;
@@ -35,6 +44,24 @@ const userSchema = new Schema<IUser>(
             type: String,
             default: null,
         },
+        sessionsHosted: {
+            type: Number,
+            default: 0
+        },
+        moviesWatched: {
+            type: Number,
+            default: 0
+        },
+        hoursWatched: {
+            type: Number,
+            default: 0
+        },
+        watchHistory: [{
+            movieId: { type: Schema.Types.ObjectId, ref: 'Movie' },
+            title: String,
+            date: { type: Date, default: Date.now },
+            rating: { type: Number, default: 0 }
+        }]
     },
     {
         timestamps: true,

@@ -11,9 +11,10 @@ interface WaitingRoomProps {
   onNavigate: (screen: Screen) => void;
   selectedMovie: Movie | null;
   roomTheme: RoomTheme;
+  onRoomUpdate?: (room: any) => void;
 }
 
-export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoomProps) {
+export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate }: WaitingRoomProps) {
   const [copied, setCopied] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
@@ -40,6 +41,9 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
         const response = await roomApi.getById(token, roomId);
         if (response.success && response.data) {
           setRoom(response.data);
+          if (onRoomUpdate) {
+            onRoomUpdate(response.data);
+          }
         } else {
           toast.error('Failed to load room details');
         }
@@ -52,7 +56,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
     };
 
     fetchRoom();
-  }, []);
+  }, [onNavigate, onRoomUpdate]);
 
   const handleCopy = () => {
     if (room?.code) {
@@ -97,9 +101,9 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
             <ArrowLeft className="w-4 h-4" />
             Leave Room
           </button>
-          
+
           <div className="flex items-center gap-3">
-            <div 
+            <div
               className="px-4 py-2 rounded-full border flex items-center gap-2"
               style={{
                 backgroundColor: `${roomTheme.primary}20`,
@@ -196,11 +200,10 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setMicOn(!micOn)}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                      micOn
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${micOn
                         ? 'bg-white/10 hover:bg-white/20'
                         : 'bg-red-500/20 hover:bg-red-500/30'
-                    }`}
+                      }`}
                   >
                     {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                   </button>

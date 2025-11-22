@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { Movie } from '../models/Movie';
+import { createDirectUpload, getAssetDetails, formatDuration, getUploadDetails } from '../utils/mux';
+import { AuthRequest } from '../middleware/auth';
 
 // Initial movie data for seeding
 const initialMovies = [
@@ -116,6 +118,15 @@ export const getMovieById = async (req: Request, res: Response): Promise<void> =
             data: movie,
         });
     } catch (error: any) {
+        // Handle invalid ID format (CastError)
+        if (error.name === 'CastError') {
+            res.status(404).json({
+                success: false,
+                message: 'Movie not found',
+            });
+            return;
+        }
+
         console.error('Get movie error:', error);
         res.status(500).json({
             success: false,
@@ -147,3 +158,152 @@ export const seedMovies = async (req: Request, res: Response): Promise<void> => 
         });
     }
 };
+
+// POST /api/movies/upload-url
+export const createUploadUrl = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const { uploadUrl, assetId, uploadId } = await createDirectUpload();
+
+        res.status(200).json({
+            success: true,
+            data: {
+                uploadUrl,
+                assetId,
+                uploadId,
+            },
+        });
+    } catch (error: any) {
+        console.error('Create upload URL error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create upload URL',
+            error: error.message,
+        });
+    }
+};
+
+// GET /api/movies/upload/:uploadId
+export const getUpload = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const { uploadId } = req.params;
+        const upload = await getUploadDetails(uploadId);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                id: upload.id,
+                status: upload.status,
+                assetId: upload.asset_id || '',
+            },
+        });
+    } catch (error: any) {
+        console.error('Get upload error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve upload details',
+            error: error.message,
+        });
+    }
+};
+
+// POST /api/movies
+export const createMovie = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const { title, genre, muxAssetId, muxPlaybackId, duration, rating, image } = req.body;
+
+        // Validate required fields
+        if (!title || !genre || !muxPlaybackId) {
+            res.status(400).json({
+                success: false,
+                message: 'Title, genre, and Mux playback ID are required',
+            });
+            return;
+        }
+
+        // Create movie
+        const movie = await Movie.create({
+            title,
+            genre,
+            muxAssetId,
+            muxPlaybackId,
+            videoUrl: `https://stream.mux.com/${muxPlaybackId}.m3u8`,
+            duration: duration || 'N/A',
+            rating: rating || 'N/A',
+            image: image || `https://image.mux.com/${muxPlaybackId}/thumbnail.jpg`,
+            description: `User uploaded: ${title}`,
+            year: new Date().getFullYear(),
+        });
+
+        res.status(201).json({
+            success: true,
+            data: movie,
+        });
+    } catch (error: any) {
+        console.error('Create movie error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create movie',
+            error: error.message,
+        });
+    }
+};
+
+// GET /api/movies/asset/:assetId
+export const getAsset = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const { assetId } = req.params;
+        const asset = await getAssetDetails(assetId);
+
+        // Extract playback ID
+        const playbackId = asset.playback_ids?.[0]?.id || '';
+
+        // Format duration if available
+        let duration = 'N/A';
+        if (asset.duration) {
+            duration = formatDuration(asset.duration);
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                assetId: asset.id,
+                playbackId,
+                duration,
+                status: asset.status,
+                thumbnailUrl: playbackId ? `https://image.mux.com/${playbackId}/thumbnail.jpg` : null,
+            },
+        });
+    } catch (error: any) {
+        console.error('Get asset error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve asset details',
+            error: error.message,
+        });
+    }
+};
+
