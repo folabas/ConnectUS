@@ -50,7 +50,7 @@ app.use(cors({
 }));
 
 // Handle preflight requests
-app.options("*", cors());
+app.options("/*", cors());
 
 // Body parsing middleware
 app.use(express.json());
