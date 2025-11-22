@@ -51,7 +51,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
-  const [activeRoom, setActiveRoom] = useState<Room | null>(currentRoom);
+  const [activeRoom, setActiveRoom] = useState<Room | null>(currentRoom || null);
   const [chatInput, setChatInput] = useState('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -67,7 +67,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const { localStream, peers, messages, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
 
   useEffect(() => {
-    setActiveRoom(currentRoom);
+    setActiveRoom(currentRoom || null);
   }, [currentRoom]);
 
   useEffect(() => {
