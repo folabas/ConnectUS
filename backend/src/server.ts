@@ -22,8 +22,12 @@ const httpServer = createServer(app);
 // Initialize Socket.io
 const io = new Server(httpServer, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-        methods: ['GET', 'POST'],
+        origin: [
+            "http://localhost:3000",
+            "https://connectus.live",
+            "https://www.connectus.live"
+        ],
+        methods: ["GET", "POST"],
         credentials: true
     }
 });

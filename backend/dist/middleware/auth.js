@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.authMiddleware = void 0;
+exports.protect = exports.authMiddleware = void 0;
 const jwt_1 = require("../utils/jwt");
 const authMiddleware = (req, res, next) => {
     try {
@@ -25,4 +25,6 @@ const authMiddleware = (req, res, next) => {
     }
 };
 exports.authMiddleware = authMiddleware;
+// Alias for consistency with common naming conventions
+exports.protect = exports.authMiddleware;
 //# sourceMappingURL=auth.js.map

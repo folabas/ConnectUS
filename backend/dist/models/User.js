@@ -62,6 +62,33 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         default: null,
     },
+    sessionsHosted: {
+        type: Number,
+        default: 0
+    },
+    moviesWatched: {
+        type: Number,
+        default: 0
+    },
+    hoursWatched: {
+        type: Number,
+        default: 0
+    },
+    watchHistory: [{
+            movieId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Movie' },
+            title: String,
+            date: { type: Date, default: Date.now },
+            rating: { type: Number, default: 0 }
+        }],
+    onlineStatus: {
+        type: String,
+        enum: ['online', 'offline'],
+        default: 'offline'
+    },
+    lastSeen: {
+        type: Date,
+        default: Date.now
+    }
 }, {
     timestamps: true,
 });

@@ -4,6 +4,17 @@ export interface IUser extends Document {
     password: string;
     fullName?: string;
     avatarUrl?: string;
+    sessionsHosted: number;
+    moviesWatched: number;
+    hoursWatched: number;
+    watchHistory: {
+        movieId: mongoose.Types.ObjectId;
+        title: string;
+        date: Date;
+        rating: number;
+    }[];
+    onlineStatus: 'online' | 'offline';
+    lastSeen: Date;
     createdAt: Date;
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;

@@ -230,15 +230,23 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
             message: 'If an account with that email exists, a password reset link has been sent',
         });
 
-        // TODO: Implement email sending logic
-        // For now, just log the reset token
+        // Send password reset email if user exists
         if (user) {
             const resetToken = generateToken({
                 userId: user._id.toString(),
                 email: user.email,
             });
-            console.log('Password reset token:', resetToken);
-            // Send email with reset link: ${process.env.FRONTEND_URL}/reset-password/${resetToken}
+
+            // Import emailService at the top of the file
+            const { emailService } = await import('../services/emailService');
+
+            await emailService.sendPasswordReset(
+                user.email,
+                user.fullName || user.email,
+                resetToken
+            );
+
+            console.log('Password reset email sent to:', user.email);
         }
     } catch (error: any) {
         console.error('Forgot password error:', error);

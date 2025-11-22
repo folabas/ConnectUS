@@ -15,6 +15,7 @@ interface AuthenticationProps {
 
 export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
@@ -88,6 +89,34 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.email) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await authApi.forgotPassword(formData.email);
+
+      if (response.success) {
+        toast.success('Password reset link sent to your email!');
+        setIsForgotPassword(false);
+        setIsLogin(true);
+      } else {
+        toast.error(response.message || 'Failed to send reset email');
+      }
+    } catch (error: any) {
+      console.error('Forgot password error:', error);
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white flex">
       {/* Left Side - Illustration */}
@@ -133,15 +162,17 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
 
           <div className="mb-8">
             <h1 className="text-4xl mb-2 tracking-tight">
-              {isLogin ? 'Welcome back' : 'Create account'}
+              {isForgotPassword ? 'Reset password' : (isLogin ? 'Welcome back' : 'Create account')}
             </h1>
             <p className="text-white/60">
-              {isLogin ? 'Sign in to continue your experience' : 'Start your movie journey today'}
+              {isForgotPassword
+                ? 'Enter your email to receive a reset link'
+                : (isLogin ? 'Sign in to continue your experience' : 'Start your movie journey today')}
             </p>
           </div>
 
-          <div className="space-y-4 mb-6">
-            {!isLogin && (
+          <form onSubmit={isForgotPassword ? handleForgotPassword : handleSubmit} className="space-y-4 mb-6">
+            {!isLogin && !isForgotPassword && (
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                 <Input
@@ -167,68 +198,95 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
               />
             </div>
 
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-              <Input
-                type="password"
-                name="password"
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
-              />
-            </div>
+            {!isForgotPassword && (
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                <Input
+                  type="password"
+                  name="password"
+                  placeholder="Password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                />
+              </div>
+            )}
 
-            {isLogin && (
+            {isLogin && !isForgotPassword && (
               <div className="flex items-center justify-end">
-                <button className="text-sm text-[#695CFF] hover:text-[#8B7FFF] transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(true)}
+                  className="text-sm text-[#695CFF] hover:text-[#8B7FFF] transition-colors"
+                >
                   Forgot password?
                 </button>
               </div>
             )}
-          </div>
 
-          <Button
-            onClick={handleSubmit}
-            disabled={isLoading}
-            className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
-          </Button>
-
-          <div className="relative my-8">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-[#0D0D0F] text-white/40">Or continue with</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-8">
             <Button
-              variant="outline"
-              className="h-14 border-white/10 hover:bg-white/5 rounded-2xl text-white"
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Google
+              {isLoading
+                ? 'Please wait...'
+                : isForgotPassword
+                  ? 'Send Reset Link'
+                  : (isLogin ? 'Sign In' : 'Create Account')}
             </Button>
-            <Button
-              variant="outline"
-              className="h-14 border-white/10 hover:bg-white/5 rounded-2xl text-white"
-            >
-              Apple
-            </Button>
-          </div>
+          </form>
 
-          <p className="text-center text-white/60">
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-[#695CFF] hover:text-[#8B7FFF] transition-colors"
-            >
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </button>
-          </p>
+          {isForgotPassword ? (
+            <p className="text-center text-white/60">
+              Remember your password?{' '}
+              <button
+                onClick={() => {
+                  setIsForgotPassword(false);
+                  setIsLogin(true);
+                }}
+                className="text-[#695CFF] hover:text-[#8B7FFF] transition-colors"
+              >
+                Sign in
+              </button>
+            </p>
+          ) : (
+            <>
+              <div className="relative my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-[#0D0D0F] text-white/40">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <Button
+                  variant="outline"
+                  className="h-14 border-white/10 hover:bg-white/5 rounded-2xl text-white"
+                >
+                  Google
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-14 border-white/10 hover:bg-white/5 rounded-2xl text-white"
+                >
+                  Apple
+                </Button>
+              </div>
+
+              <p className="text-center text-white/60">
+                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                <button
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="text-[#695CFF] hover:text-[#8B7FFF] transition-colors"
+                >
+                  {isLogin ? 'Sign up' : 'Sign in'}
+                </button>
+              </p>
+            </>
+          )}
         </motion.div>
       </div>
     </div>
