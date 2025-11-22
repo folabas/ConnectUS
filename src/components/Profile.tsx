@@ -1,10 +1,23 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, Calendar, Film, Users, Star, Edit2 } from 'lucide-react';
+import { ArrowLeft, Mail, Calendar, Film, Users, Star, Edit2, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Screen } from '../App';
+import { authApi, userStorage, tokenStorage } from '@/services/api';
+import { toast } from 'sonner';
 
 interface ProfileProps {
   onNavigate: (screen: Screen) => void;
+}
+
+interface UserData {
+  userId: string;
+  email: string;
+  fullName?: string;
+  avatarUrl?: string;
+  createdAt?: string;
 }
 
 const watchHistory = [
@@ -20,6 +33,83 @@ const stats = [
 ];
 
 export function Profile({ onNavigate }: ProfileProps) {
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        // First try to get from localStorage
+        const storedUser = userStorage.get();
+        if (storedUser) {
+          setUserData(storedUser);
+        }
+
+        // Get the token
+        const token = tokenStorage.get();
+        if (!token) {
+          toast.error('Please log in to view your profile');
+          onNavigate('auth');
+          return;
+        }
+
+        // Then fetch fresh data from backend
+        const response = await authApi.getMe(token);
+        if (response.success && response.data) {
+          setUserData(response.data);
+          // Update localStorage with fresh data
+          userStorage.set(response.data);
+        } else {
+          // If not authenticated, redirect to auth
+          toast.error('Please log in to view your profile');
+          onNavigate('auth');
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        toast.error('Failed to load profile data');
+        // Redirect to auth if there's an error
+        onNavigate('auth');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [onNavigate]);
+
+  // Get initials for avatar
+  const getInitials = (name?: string, email?: string) => {
+    if (name) {
+      const parts = name.split(' ');
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return name.substring(0, 2).toUpperCase();
+    }
+    if (email) {
+      return email.substring(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  // Format join date
+  const formatJoinDate = (dateString?: string) => {
+    if (!dateString) return 'Recently';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-[#695CFF] mx-auto mb-4" />
+          <p className="text-white/60">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white">
       {/* Header */}
@@ -51,25 +141,35 @@ export function Profile({ onNavigate }: ProfileProps) {
             className="mb-12 text-center"
           >
             <div className="relative inline-block mb-6">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center text-4xl">
-                SC
-              </div>
+              {userData?.avatarUrl ? (
+                <img
+                  src={userData.avatarUrl}
+                  alt={userData.fullName || 'User'}
+                  className="w-32 h-32 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center text-4xl">
+                  {getInitials(userData?.fullName, userData?.email)}
+                </div>
+              )}
               <button className="absolute bottom-0 right-0 w-10 h-10 rounded-full bg-[#695CFF] hover:bg-[#5a4de6] flex items-center justify-center transition-colors border-4 border-[#0D0D0F]">
                 <Edit2 className="w-4 h-4" />
               </button>
             </div>
-            
-            <h1 className="text-4xl mb-2 tracking-tight">Sarah Chen</h1>
+
+            <h1 className="text-4xl mb-2 tracking-tight">
+              {userData?.fullName || 'User'}
+            </h1>
             <p className="text-white/60 text-lg mb-4">Movie enthusiast & host</p>
-            
+
             <div className="flex items-center justify-center gap-4 text-sm text-white/60">
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4" />
-                sarah.chen@email.com
+                {userData?.email || 'No email'}
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                Joined Nov 2024
+                Joined {formatJoinDate(userData?.createdAt)}
               </div>
             </div>
           </motion.div>
@@ -101,7 +201,7 @@ export function Profile({ onNavigate }: ProfileProps) {
             className="p-8 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10"
           >
             <h2 className="text-2xl mb-6 tracking-tight">Recent Watch History</h2>
-            
+
             <div className="space-y-4">
               {watchHistory.map((movie, index) => (
                 <motion.div
@@ -120,16 +220,15 @@ export function Profile({ onNavigate }: ProfileProps) {
                       <p className="text-sm text-white/60">{movie.date}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
-                        className={`w-4 h-4 ${
-                          i < movie.rating
-                            ? 'fill-[#695CFF] text-[#695CFF]'
-                            : 'text-white/20'
-                        }`}
+                        className={`w-4 h-4 ${i < movie.rating
+                          ? 'fill-[#695CFF] text-[#695CFF]'
+                          : 'text-white/20'
+                          }`}
                       />
                     ))}
                   </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import MuxPlayer from '@mux/mux-player-react';
 import type { ComponentType, SVGProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward } from 'lucide-react';
@@ -48,9 +49,15 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
   const reactionIdRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const defaultMovie = {
+  const defaultMovie: Movie = {
+    id: 'default-1',
     title: 'Quantum Horizon',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    muxPlaybackId: '36q401a684q7k960015d8000',
+    image: '/placeholder.jpg',
+    duration: '10:00',
+    rating: 'PG',
+    genre: 'Sci-Fi'
   };
 
   const movie = selectedMovie || defaultMovie;
@@ -178,19 +185,34 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
     <div ref={containerRef} className="h-screen bg-[#0D0D0F] text-white flex flex-col overflow-hidden">
       {/* Main Content Area */}
       <div className="flex-1 flex relative">
-        {/* Video Player Area */}
         <div
           className="flex-1 relative bg-black flex items-center justify-center"
           onMouseMove={handleMouseMove}
           onMouseLeave={() => isPlaying && setShowControls(false)}
         >
           {/* Video Element */}
-          <video
-            ref={videoRef}
-            className="w-full h-full object-contain"
-            src={movie.videoUrl}
-            onClick={togglePlay}
-          />
+          {movie.muxPlaybackId ? (
+            <MuxPlayer
+              ref={videoRef as any}
+              className="w-full h-full object-contain"
+              playbackId={movie.muxPlaybackId}
+              metadata={{
+                video_id: movie.id,
+                video_title: movie.title,
+                viewer_user_id: 'user-id-placeholder', // Should come from auth
+                env_key: process.env.NEXT_PUBLIC_MUX_ENV_KEY, // Mux Data Env Key
+              }}
+              streamType="on-demand"
+              autoPlay={false}
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              className="w-full h-full object-contain"
+              src={movie.videoUrl}
+              onClick={togglePlay}
+            />
+          )}
 
           {/* Top Right Controls and Participants */}
           <div className="absolute top-6 right-6 flex gap-3 items-start z-50">
@@ -361,7 +383,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
                     </div>
                   </div>
 
-                  
+
                 </div>
               </motion.div>
             )}
@@ -420,7 +442,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
                     placeholder="Type a message..."
                     className="flex-1 h-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF]"
                   />
-                  <Button 
+                  <Button
                     className="h-12 px-6 rounded-2xl text-white"
                     style={{
                       background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
@@ -449,9 +471,8 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={toggleMic}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-              micOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'
-            }`}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${micOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'
+              }`}
           >
             {micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-red-500" />}
           </motion.button>
@@ -459,9 +480,8 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={toggleVideo}
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-              videoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'
-            }`}
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${videoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'
+              }`}
           >
             {videoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-red-500" />}
           </motion.button>
@@ -475,6 +495,6 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme }: Movie
           </motion.button>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

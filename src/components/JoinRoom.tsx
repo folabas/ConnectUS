@@ -1,17 +1,62 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, LogIn, Copy } from 'lucide-react';
+import { ArrowLeft, LogIn, Copy, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-
 import { Screen } from '../App';
+import { roomApi, tokenStorage } from '@/services/api';
+import { toast } from 'sonner';
 
 interface JoinRoomProps {
   onNavigate: (screen: Screen) => void;
 }
 
 export function JoinRoom({ onNavigate }: JoinRoomProps) {
+  const [roomCode, setRoomCode] = useState('');
+  const [joining, setJoining] = useState(false);
   const roomType = typeof window !== 'undefined' ? localStorage.getItem('roomType') : null;
   const isPublic = roomType === 'public';
+
+  const handleJoinRoom = async () => {
+    if (!isPublic && !roomCode.trim()) {
+      toast.error('Please enter a room code');
+      return;
+    }
+
+    const token = tokenStorage.get();
+    if (!token) {
+      toast.error('Please log in to join a room');
+      onNavigate('auth');
+      return;
+    }
+
+    setJoining(true);
+    try {
+      // If public, we might need a different flow or list selection
+      // For now, assuming this component is mainly for code entry
+      // Public rooms are joined from the list (which we haven't built yet, but is part of the plan)
+
+      const response = await roomApi.join(token, {
+        code: roomCode
+      });
+
+      if (response.success && response.data) {
+        toast.success('Joined room successfully!');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('currentRoomId', response.data._id);
+        }
+        onNavigate('waiting-room');
+      } else {
+        toast.error(response.message || 'Failed to join room');
+      }
+    } catch (error) {
+      console.error('Error joining room:', error);
+      toast.error('Failed to join room');
+    } finally {
+      setJoining(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center p-8">
       <div className="w-full max-w-md">
@@ -47,7 +92,9 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
                 <Input
                   type="text"
                   placeholder="abc123xyz"
-                  className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10 text-center text-lg tracking-widest"
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10 text-center text-lg tracking-widest uppercase"
                 />
               </div>
             )}
@@ -78,10 +125,18 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
           </div>
 
           <Button
-            onClick={() => onNavigate('waiting-room')}
-            className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl mb-4"
+            onClick={handleJoinRoom}
+            disabled={joining}
+            className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Join Room
+            {joining ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Joining...
+              </>
+            ) : (
+              'Join Room'
+            )}
           </Button>
 
           <p className="text-center text-sm text-white/40">

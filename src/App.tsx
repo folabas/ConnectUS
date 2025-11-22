@@ -12,13 +12,14 @@ import { JoinRoom } from './components/JoinRoom';
 export type Screen = 'landing' | 'auth' | 'library' | 'create-room' | 'join-room' | 'waiting-room' | 'watch' | 'profile' | 'settings';
 
 export interface Movie {
-  id: number;
+  id: string;
   title: string;
   image: string;
   duration: string;
   rating: string;
   genre: string;
   videoUrl?: string;
+  muxPlaybackId?: string;
 }
 
 export interface RoomTheme {

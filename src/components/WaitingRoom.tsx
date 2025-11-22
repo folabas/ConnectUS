@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
-import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Movie, RoomTheme, Screen } from '../App';
+import { roomApi, tokenStorage } from '@/services/api';
+import { toast } from 'sonner';
 
 interface WaitingRoomProps {
   onNavigate: (screen: Screen) => void;
@@ -11,45 +13,77 @@ interface WaitingRoomProps {
   roomTheme: RoomTheme;
 }
 
-const participants = [
-  { id: 1, name: 'Sarah Chen', avatar: 'SC', online: true },
-  { id: 2, name: 'Alex Morgan', avatar: 'AM', online: true },
-  { id: 3, name: 'Jordan Lee', avatar: 'JL', online: true },
-  { id: 4, name: 'Taylor Kim', avatar: 'TK', online: false }
-];
-
 export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoomProps) {
   const [copied, setCopied] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
-  const [roomType] = useState<'private' | 'public'>(() => {
-    const v = typeof window !== 'undefined' ? localStorage.getItem('roomType') : null;
-    return v === 'public' ? 'public' : 'private';
-  });
-  const [adminEnabled] = useState<boolean>(() => {
-    const v = typeof window !== 'undefined' ? localStorage.getItem('adminEnabled') : null;
-    return v ? v === 'true' : true;
-  });
-  const [maxParticipants] = useState<number>(() => {
-    const v = typeof window !== 'undefined' ? localStorage.getItem('maxParticipants') : null;
-    const n = v ? parseInt(v, 10) : 4;
-    return Math.min(4, Math.max(1, isNaN(n) ? 4 : n));
-  });
+  const [room, setRoom] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRoom = async () => {
+      const roomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
+      if (!roomId) {
+        setLoading(false);
+        return;
+      }
+
+      const token = tokenStorage.get();
+      if (!token) {
+        toast.error('Please log in to view this room');
+        onNavigate('auth');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await roomApi.getById(token, roomId);
+        if (response.success && response.data) {
+          setRoom(response.data);
+        } else {
+          toast.error('Failed to load room details');
+        }
+      } catch (error) {
+        console.error('Error fetching room:', error);
+        toast.error('Failed to load room');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRoom();
+  }, []);
 
   const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (room?.code) {
+      const link = `${window.location.origin}/join/${room.code}`;
+      navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
-  const defaultMovie = {
-    title: 'Quantum Horizon',
-    image: 'https://images.unsplash.com/photo-1655367574486-f63675dd69eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGNpbmVtYXxlbnwxfHx8fDE3NjMzODE5NTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    duration: '2h 15m',
-    rating: '8.5',
-    genre: 'Sci-Fi'
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-[#695CFF]" />
+      </div>
+    );
+  }
+
+  const displayMovie = room?.movie || selectedMovie || {
+    title: 'Unknown Movie',
+    image: '/placeholder.jpg',
+    duration: '--',
+    rating: '--',
+    genre: '--'
   };
 
-  const movie = selectedMovie || defaultMovie;
+  const participants = room?.participants || [];
+  const maxParticipants = room?.maxParticipants || 4;
+  const roomCode = room?.code || '---';
+  const isPrivate = room?.type === 'private';
+  const inviteLink = typeof window !== 'undefined' ? `${window.location.host}/join/${roomCode}` : `connectus.app/join/${roomCode}`;
 
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white">
@@ -73,7 +107,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
               }}
             >
               <Users className="w-4 h-4" style={{ color: roomTheme.primary }} />
-              <span className="text-sm">{participants.filter(p => p.online).length}/{maxParticipants}</span>
+              <span className="text-sm">{participants.length}/{maxParticipants}</span>
             </div>
           </div>
         </div>
@@ -87,7 +121,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
             className="mb-12 text-center"
           >
             <h1 className="text-4xl mb-3 tracking-tight">Waiting Room</h1>
-            <p className="text-white/60 text-lg">{roomType === 'public' ? 'Public room – anyone can join' : 'Invite friends to join your session'}</p>
+            <p className="text-white/60 text-lg">{!isPrivate ? 'Public room – anyone can join' : 'Invite friends to join your session'}</p>
           </motion.div>
 
           <div className="grid lg:grid-cols-3 gap-8">
@@ -98,12 +132,12 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
               transition={{ delay: 0.1 }}
               className="lg:col-span-2 space-y-6"
             >
-              {roomType === 'private' ? (
+              {isPrivate ? (
                 <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
                   <label className="text-sm text-white/60 mb-3 block">Room Invite Link</label>
                   <div className="flex gap-3">
-                    <div className="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60">
-                      connectus.app/room/abc123xyz
+                    <div className="flex-1 px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-white/60 truncate">
+                      {inviteLink}
                     </div>
                     <Button
                       onClick={handleCopy}
@@ -115,6 +149,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
                       {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </Button>
                   </div>
+                  <p className="mt-2 text-sm text-white/40">Room Code: <span className="text-white font-mono">{roomCode}</span></p>
                 </div>
               ) : (
                 <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
@@ -129,30 +164,30 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
               <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
                 <h3 className="text-lg mb-4">Participants</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {participants.map((participant, index) => (
-                    <motion.div
-                      key={participant.id}
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.2 + index * 0.05 }}
-                      className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3"
-                    >
-                      <div className="relative">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center">
-                          {participant.avatar}
+                  {participants.length > 0 ? (
+                    participants.map((participant: any, index: number) => (
+                      <motion.div
+                        key={participant._id || index}
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.2 + index * 0.05 }}
+                        className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-3"
+                      >
+                        <div className="relative">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center text-lg font-medium">
+                            {participant.fullName ? participant.fullName.substring(0, 2).toUpperCase() : '??'}
+                          </div>
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#0D0D0F] bg-green-500`} />
                         </div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#0D0D0F] ${
-                          participant.online ? 'bg-green-500' : 'bg-white/20'
-                        }`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate">{participant.name}</p>
-                        <p className="text-xs text-white/40">
-                          {participant.online ? 'Online' : 'Offline'}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))}
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate">{participant.fullName || 'Unknown User'}</p>
+                          <p className="text-xs text-white/40">Online</p>
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="col-span-2 text-center text-white/40 py-4">Waiting for participants...</div>
+                  )}
                 </div>
               </div>
 
@@ -179,14 +214,13 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
 
                 <Button
                   onClick={() => onNavigate('watch')}
-                  disabled={!adminEnabled}
-                  className="text-white rounded-full px-8 gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-white rounded-full px-8 gap-2"
                   style={{
                     background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
                   }}
                 >
                   <Play className="w-4 h-4" />
-                  {adminEnabled ? 'Start Session' : 'Admin disabled'}
+                  Start Session
                 </Button>
               </div>
             </motion.div>
@@ -201,13 +235,13 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
               <div className="sticky top-8 p-6 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10">
                 <div className="mb-4">
                   <p className="text-sm text-white/60 mb-2">Now Playing</p>
-                  <h2 className="text-xl tracking-tight">{movie.title}</h2>
+                  <h2 className="text-xl tracking-tight">{displayMovie.title}</h2>
                 </div>
 
                 <div className="relative aspect-video rounded-2xl overflow-hidden mb-4 bg-white/5">
                   <ImageWithFallback
-                    src={movie.image}
-                    alt={movie.title}
+                    src={displayMovie.image}
+                    alt={displayMovie.title}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -215,17 +249,17 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme }: WaitingRoo
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-white/60">Duration</span>
-                    <span>{movie.duration}</span>
+                    <span>{displayMovie.duration}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-white/60">Rating</span>
-                    <span>★ {movie.rating}</span>
+                    <span>★ {displayMovie.rating}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-white/60">Genre</span>
-                    <span>{movie.genre}</span>
+                    <span>{displayMovie.genre}</span>
                   </div>
-                  {participants.filter(p => p.online).length >= maxParticipants && (
+                  {participants.length >= maxParticipants && (
                     <div className="mt-3 text-xs text-red-400">Room is at capacity ({maxParticipants})</div>
                   )}
                 </div>
