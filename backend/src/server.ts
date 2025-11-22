@@ -1,15 +1,19 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { connectDB } from './config/database';
 import authRoutes from './routes/authRoutes';
 import movieRoutes from './routes/movieRoutes';
 import roomRoutes from './routes/roomRoutes';
-
-// Load environment variables
-dotenv.config();
+import friendRoutes from './routes/friendRoutes';
+import notificationRoutes from './routes/notificationRoutes';
+import { User } from './models/User';
+import { Friend } from './models/Friend';
 
 // Create Express app
 const app: Application = express();
@@ -33,8 +37,33 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Socket.io Signaling Logic
+const userSockets = new Map<string, string>(); // userId -> socketId
+
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+
+    // User online status
+    socket.on('user-online', async (userId: string) => {
+        userSockets.set(userId, socket.id);
+        await User.findByIdAndUpdate(userId, { onlineStatus: 'online', lastSeen: new Date() });
+
+        // Notify friends
+        const friendships = await Friend.find({
+            $or: [{ requester: userId }, { recipient: userId }],
+            status: 'accepted'
+        });
+
+        const friendIds = friendships.map(f =>
+            f.requester.toString() === userId ? f.recipient.toString() : f.requester.toString()
+        );
+
+        friendIds.forEach(friendId => {
+            const friendSocketId = userSockets.get(friendId);
+            if (friendSocketId) {
+                io.to(friendSocketId).emit('friend-online', userId);
+            }
+        });
+    });
 
     socket.on('join-room', (roomId: string, userId: string) => {
         socket.join(roomId);
@@ -61,12 +90,50 @@ io.on('connection', (socket) => {
     socket.on('chat-message', (payload) => {
         io.to(payload.roomId).emit('chat-message', payload);
     });
+
+    socket.on('disconnect', async () => {
+        // Find user by socket ID
+        let disconnectedUserId: string | null = null;
+        for (const [userId, socketId] of userSockets.entries()) {
+            if (socketId === socket.id) {
+                disconnectedUserId = userId;
+                userSockets.delete(userId);
+                break;
+            }
+        }
+
+        if (disconnectedUserId) {
+            await User.findByIdAndUpdate(disconnectedUserId, {
+                onlineStatus: 'offline',
+                lastSeen: new Date()
+            });
+
+            // Notify friends
+            const friendships = await Friend.find({
+                $or: [{ requester: disconnectedUserId }, { recipient: disconnectedUserId }],
+                status: 'accepted'
+            });
+
+            const friendIds = friendships.map(f =>
+                f.requester.toString() === disconnectedUserId ? f.recipient.toString() : f.requester.toString()
+            );
+
+            friendIds.forEach(friendId => {
+                const friendSocketId = userSockets.get(friendId);
+                if (friendSocketId) {
+                    io.to(friendSocketId).emit('friend-offline', disconnectedUserId);
+                }
+            });
+        }
+    });
 });
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/movies', movieRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/friends', friendRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check route
 app.get('/api/health', (req: Request, res: Response) => {

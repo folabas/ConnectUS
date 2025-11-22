@@ -15,6 +15,8 @@ export interface IUser extends Document {
         date: Date;
         rating: number;
     }[];
+    onlineStatus: 'online' | 'offline';
+    lastSeen: Date;
     createdAt: Date;
     updatedAt: Date;
     comparePassword(candidatePassword: string): Promise<boolean>;
@@ -61,7 +63,16 @@ const userSchema = new Schema<IUser>(
             title: String,
             date: { type: Date, default: Date.now },
             rating: { type: Number, default: 0 }
-        }]
+        }],
+        onlineStatus: {
+            type: String,
+            enum: ['online', 'offline'],
+            default: 'offline'
+        },
+        lastSeen: {
+            type: Date,
+            default: Date.now
+        }
     },
     {
         timestamps: true,

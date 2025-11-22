@@ -307,6 +307,148 @@ export const roomApi = {
     },
 };
 
+// Friend API Service
+export const friendApi = {
+    // Send friend request
+    sendRequest: async (token: string, recipientId: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/friends/request`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ recipientId }),
+        });
+        return response.json();
+    },
+
+    // Accept friend request
+    accept: async (token: string, friendshipId: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/friends/accept/${friendshipId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Reject friend request
+    reject: async (token: string, friendshipId: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/friends/reject/${friendshipId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Get all friends
+    getAll: async (token: string): Promise<ApiResponse<any[]>> => {
+        const response = await fetch(`${API_URL}/api/friends`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Get pending requests
+    getPending: async (token: string): Promise<ApiResponse<any[]>> => {
+        const response = await fetch(`${API_URL}/api/friends/pending`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Remove friend
+    // Remove friend
+    remove: async (token: string, friendshipId: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/friends/${friendshipId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Invite friend to room
+    inviteToRoom: async (token: string, friendId: string, roomId: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/friends/invite/${friendId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ roomId }),
+        });
+        return response.json();
+    },
+
+    // Search users
+    search: async (token: string, query: string): Promise<ApiResponse<any[]>> => {
+        const response = await fetch(`${API_URL}/api/friends/search?query=${encodeURIComponent(query)}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+};
+
+// Notification API Service
+export const notificationApi = {
+    // Get all notifications
+    getAll: async (token: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/notifications`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Mark notification as read
+    markRead: async (token: string, notificationId: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/notifications/${notificationId}/read`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+
+    // Mark all notifications as read
+    markAllRead: async (token: string): Promise<ApiResponse> => {
+        const response = await fetch(`${API_URL}/api/notifications/read-all`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        return response.json();
+    },
+};
+
+
 // Local Storage Helpers
 export const tokenStorage = {
     set: (token: string) => {

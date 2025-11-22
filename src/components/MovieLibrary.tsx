@@ -8,6 +8,8 @@ import { Movie, Screen } from '../App';
 import { movieApi } from '@/services/api';
 import { toast } from 'sonner';
 import { UploadMovieModal } from './UploadMovieModal';
+import { FriendsSidebar } from './FriendsSidebar';
+
 
 interface MovieLibraryProps {
   onNavigate: (screen: Screen) => void;
@@ -22,6 +24,8 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [friendsSidebarOpen, setFriendsSidebarOpen] = useState(false);
+
 
   const fetchMovies = async () => {
     setLoading(true);
@@ -83,6 +87,13 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
           >
             <Users className="w-4 h-4" />
             Join Room
+          </Button>
+          <Button
+            onClick={() => setFriendsSidebarOpen(true)}
+            className="bg-white/10 hover:bg-white/20 text-white rounded-full px-4 h-10"
+          >
+            <Users className="w-4 h-4 mr-2" />
+            Friends
           </Button>
 
           <Button
@@ -233,6 +244,10 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
           fetchMovies();
           setUploadModalOpen(false);
         }}
+      />
+      <FriendsSidebar
+        isOpen={friendsSidebarOpen}
+        onClose={() => setFriendsSidebarOpen(false)}
       />
     </div>
   );

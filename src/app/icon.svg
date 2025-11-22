@@ -1,0 +1,33 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="50" cy="50" r="48" fill="url(#gradient)" />
+  
+  <!-- Play Button Triangle -->
+  <path d="M40 32L40 68L68 50L40 32Z" fill="white" opacity="0.95" />
+  
+  <!-- Connection Dots - Left -->
+  <circle cx="22" cy="30" r="4" fill="white" opacity="0.9" />
+  <circle cx="22" cy="50" r="4" fill="white" opacity="0.9" />
+  <circle cx="22" cy="70" r="4" fill="white" opacity="0.9" />
+  
+  <!-- Connection Dots - Right -->
+  <circle cx="78" cy="30" r="4" fill="white" opacity="0.9" />
+  <circle cx="78" cy="50" r="4" fill="white" opacity="0.9" />
+  <circle cx="78" cy="70" r="4" fill="white" opacity="0.9" />
+  
+  <!-- Connection Lines -->
+  <path d="M26 30 Q33 30 38 35" stroke="white" stroke-width="2" stroke-opacity="0.4" fill="none" />
+  <path d="M26 50 Q33 50 38 50" stroke="white" stroke-width="2" stroke-opacity="0.4" fill="none" />
+  <path d="M26 70 Q33 65 38 65" stroke="white" stroke-width="2" stroke-opacity="0.4" fill="none" />
+  <path d="M68 35 Q73 30 74 30" stroke="white" stroke-width="2" stroke-opacity="0.4" fill="none" />
+  <path d="M68 50 Q73 50 74 50" stroke="white" stroke-width="2" stroke-opacity="0.4" fill="none" />
+  <path d="M68 65 Q73 70 74 70" stroke="white" stroke-width="2" stroke-opacity="0.4" fill="none" />
+  
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#695CFF" />
+      <stop offset="100%" stop-color="#8B7FFF" />
+    </linearGradient>
+  </defs>
+</svg>

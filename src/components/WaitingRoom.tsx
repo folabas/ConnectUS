@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
-import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2, UserPlus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Movie, RoomTheme, Screen } from '../App';
 import { roomApi, tokenStorage } from '@/services/api';
 import { toast } from 'sonner';
+import { InviteFriendsModal } from './InviteFriendsModal';
+
 
 interface WaitingRoomProps {
   onNavigate: (screen: Screen) => void;
@@ -18,6 +20,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const [copied, setCopied] = useState(false);
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -154,6 +157,13 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                     </Button>
                   </div>
                   <p className="mt-2 text-sm text-white/40">Room Code: <span className="text-white font-mono">{roomCode}</span></p>
+                  <Button
+                    onClick={() => setShowInviteModal(true)}
+                    className="w-full mt-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl h-12"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Invite Friends
+                  </Button>
                 </div>
               ) : (
                 <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
@@ -201,8 +211,8 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                   <button
                     onClick={() => setMicOn(!micOn)}
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${micOn
-                        ? 'bg-white/10 hover:bg-white/20'
-                        : 'bg-red-500/20 hover:bg-red-500/30'
+                      ? 'bg-white/10 hover:bg-white/20'
+                      : 'bg-red-500/20 hover:bg-red-500/30'
                       }`}
                   >
                     {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
@@ -263,7 +273,8 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                     <span>{displayMovie.genre}</span>
                   </div>
                   {participants.length >= maxParticipants && (
-                    <div className="mt-3 text-xs text-red-400">Room is at capacity ({maxParticipants})</div>
+                    <div className="mt-3 text-xs text-red-400">Room is at capacity ({maxParticipants})
+                    </div>
                   )}
                 </div>
               </div>
@@ -271,6 +282,14 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
           </div>
         </div>
       </div>
+      {/* Invite Friends Modal */}
+      {room && (
+        <InviteFriendsModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          roomId={room._id}
+        />
+      )}
     </div>
   );
 }
