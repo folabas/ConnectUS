@@ -49,8 +49,17 @@ app.use((0, cors_1.default)({
         "X-Requested-With"
     ]
 }));
-// Handle preflight requests
-app.options("*", (0, cors_1.default)());
+// Universal OPTIONS handler (Fix for Express 5)
+app.use((req, res, next) => {
+    if (req.method === "OPTIONS") {
+        res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
+        res.header("Access-Control-Allow-Credentials", "true");
+        res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+        res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With");
+        return res.sendStatus(200);
+    }
+    next();
+});
 // Body parsing middleware
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
