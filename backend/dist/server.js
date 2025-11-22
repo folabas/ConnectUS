@@ -33,29 +33,25 @@ const io = new socket_io_1.Server(httpServer, {
         credentials: true
     }
 });
-// Global CORS Handler - MUST be FIRST to handle OPTIONS preflight
-app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    // Stop OPTIONS early
-    if (req.method === "OPTIONS") {
-        return res.sendStatus(200);
-    }
-    next();
-});
-// Middleware
+// CORS Middleware - MUST be FIRST
 app.use((0, cors_1.default)({
     origin: [
         "http://localhost:3000",
         "https://connectus.live",
         "https://www.connectus.live"
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "X-Requested-With"
+    ]
 }));
+// Handle preflight requests
 app.options("*", (0, cors_1.default)());
+// Body parsing middleware
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 // Socket.io Signaling Logic
