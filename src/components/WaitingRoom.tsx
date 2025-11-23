@@ -62,26 +62,32 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   }, [onNavigate, onRoomUpdate]);
 
   // Listen for real-time room updates via Socket.io
-  useEffect(() => {
-    const socket = (window as any).socket;
-    if (!socket) return;
-
-    const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
-      const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
-      if (data.roomId === currentRoomId) {
-        setRoom((prev: any) => prev ? {
-          ...prev,
-          participants: data.participants
-        } : null);
-      }
-    };
-
-    socket.on('room-updated', handleRoomUpdate);
-
-    return () => {
-      socket.off('room-updated', handleRoomUpdate);
-    };
-  }, []);
+useEffect(() => {
+  const socket = (window as any).socket;
+  const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
+  const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
+  
+  if (!socket || !currentRoomId || !userDataStr) return;
+  // Parse user data to get userId
+  const userData = JSON.parse(userDataStr);
+  const userId = userData.userId;
+  // Emit join-room event to notify backend
+  socket.emit('join-room', currentRoomId, userId);
+  console.log('Emitted join-room:', currentRoomId, userId);
+  const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
+    if (data.roomId === currentRoomId) {
+      console.log('Room updated:', data);
+      setRoom((prev: any) => prev ? {
+        ...prev,
+        participants: data.participants
+      } : null);
+    }
+  };
+  socket.on('room-updated', handleRoomUpdate);
+  return () => {
+    socket.off('room-updated', handleRoomUpdate);
+  };
+}, []);
 
   const handleCopy = () => {
     if (room?.code) {
