@@ -15,19 +15,20 @@ export interface ChatMessage {
 }
 
 const ICE_SERVERS = {
-    iceServers: [
-        {
-            urls: [
-                "stun:stun.openrelay.metered.ca:80",
-                "turn:turn.openrelay.metered.ca:80",
-                "turn:turn.openrelay.metered.ca:3478",
-                "turn:turn.openrelay.metered.ca:443"
-            ],
-            username: "openrelayproject",
-            credential: "openrelayproject"
-        }
-    ]
+  iceServers: [
+    {
+      urls: [
+        "stun:global.stun.openrelay.metered.ca:3478",
+        "turn:global.turn.openrelay.metered.ca:80",
+        "turn:global.turn.openrelay.metered.ca:443",
+        "turn:global.turn.openrelay.metered.ca:3478"
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject"
+    }
+  ]
 };
+
 
 
 export const useWebRTC = (roomId: string | null, userId: string | null) => {
