@@ -196,8 +196,10 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
             text,
             timestamp: Date.now()
         };
+        setMessages(prev => [...prev, message]);  // Add this line to see your own messages
         signalingService.sendChatMessage({ roomId, ...message });
     };
+
 
     return {
         localStream,
