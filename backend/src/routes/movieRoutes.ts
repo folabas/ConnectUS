@@ -6,7 +6,7 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getMovies);
-router.post('/seed', seedMovies); // In production, this should be protected or removed
+router.post('/seed', protect, seedMovies); // Protected route
 
 // Protected routes (require authentication)
 router.post('/upload-url', protect, createUploadUrl);

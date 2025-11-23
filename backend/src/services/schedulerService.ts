@@ -6,7 +6,7 @@ let io: Server;
 
 class SchedulerService {
     private task: any | null = null;
-    
+
     setIo(ioInstance: Server) {
         io = ioInstance;
     }
@@ -21,6 +21,11 @@ class SchedulerService {
             }
         });
 
+        // Cleanup old rooms every hour
+        cron.schedule('0 * * * *', async () => {
+            await this.cleanupOldRooms();
+        });
+
         console.log('Room scheduler started');
     }
 
@@ -28,6 +33,29 @@ class SchedulerService {
         if (this.task) {
             this.task.stop();
             console.log('Room scheduler stopped');
+        }
+    }
+
+    private async cleanupOldRooms() {
+        try {
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+            // Delete finished rooms older than 24h
+            await Room.deleteMany({
+                status: 'finished',
+                updatedAt: { $lt: twentyFourHoursAgo }
+            });
+
+            // Delete waiting rooms older than 7 days (abandoned)
+            await Room.deleteMany({
+                status: 'waiting',
+                updatedAt: { $lt: sevenDaysAgo }
+            });
+
+            console.log('🧹 Cleaned up old rooms');
+        } catch (error) {
+            console.error('Error cleaning up rooms:', error);
         }
     }
 

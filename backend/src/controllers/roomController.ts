@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Room } from '../models/Room';
 import { User } from '../models/User';
-import { Movie } from '../models/Movie';  // Add this line
+import { Movie } from '../models/Movie';
 import { AuthRequest } from '../middleware/auth';
 import crypto from 'crypto';
 import { emailService } from '../services/emailService';
@@ -199,6 +199,12 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
                     }
                 }
             });
+
+            // Repopulate room to return full participant details
+            room = await Room.findById(room._id)
+                .populate('movie')
+                .populate('participants', 'fullName avatarUrl')
+                .populate('host', 'fullName avatarUrl');
         }
 
         res.status(200).json({
@@ -213,8 +219,9 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             error: error.message,
         });
     }
-
 };
+
+// POST /api/rooms/invite/:friendId
 export const inviteToRoom = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
         const { roomId, emails } = req.body;
@@ -241,7 +248,6 @@ export const inviteToRoom = async (req: AuthRequest, res: Response): Promise<voi
         const inviterName = user?.fullName || 'A friend';
 
         // Send emails
-        // Send emails
         const movie = await Movie.findById(room.movie);
         const movieTitle = movie?.title || 'a movie';
 
@@ -266,5 +272,49 @@ export const inviteToRoom = async (req: AuthRequest, res: Response): Promise<voi
             success: false,
             message: 'Failed to send invitations'
         });
+    }
+};
+
+// POST /api/rooms/:id/start
+export const startRoom = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.userId;
+
+        const room = await Room.findById(id);
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        if (room.host.toString() !== userId) {
+            res.status(403).json({ success: false, message: 'Only host can start room' });
+            return;
+        }
+
+        room.status = 'playing';
+        await room.save();
+
+        // Get IO instance from app
+        const io = req.app.get('io');
+        if (io) {
+            // Broadcast start event
+            io.to(id).emit('room-started', {
+                roomId: id,
+                message: "Session started",
+                room
+            });
+
+            // Trigger auto-play
+            io.to(id).emit('video-play', {
+                roomId: id,
+                currentTime: 0
+            });
+        }
+
+        res.status(200).json({ success: true, data: room });
+    } catch (error: any) {
+        console.error('Start room error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };

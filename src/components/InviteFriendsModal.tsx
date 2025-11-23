@@ -17,9 +17,10 @@ interface InviteFriendsModalProps {
     isOpen: boolean;
     onClose: () => void;
     roomId: string;
+    roomCode?: string;
 }
 
-export function InviteFriendsModal({ isOpen, onClose, roomId }: InviteFriendsModalProps) {
+export function InviteFriendsModal({ isOpen, onClose, roomId, roomCode }: InviteFriendsModalProps) {
     const [friends, setFriends] = useState<Friend[]>([]);
     const [loading, setLoading] = useState(false);
     const [inviting, setInviting] = useState(false);
@@ -125,7 +126,10 @@ export function InviteFriendsModal({ isOpen, onClose, roomId }: InviteFriendsMod
                                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center">
                                             <Users className="w-5 h-5 text-white" />
                                         </div>
-                                        <h2 className="text-xl font-bold text-white">Invite Friends</h2>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-white">Invite Friends</h2>
+                                            {roomCode && <p className="text-xs text-white/40 font-mono mt-0.5">Code: {roomCode}</p>}
+                                        </div>
                                     </div>
                                     <button
                                         onClick={onClose}
@@ -235,10 +239,10 @@ function FriendItem({
             onClick={onToggle}
             disabled={isInvited}
             className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${isInvited
-                    ? 'bg-green-500/10 border border-green-500/30 cursor-not-allowed'
-                    : isSelected
-                        ? 'bg-[#695CFF]/20 border border-[#695CFF]'
-                        : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
+                ? 'bg-green-500/10 border border-green-500/30 cursor-not-allowed'
+                : isSelected
+                    ? 'bg-[#695CFF]/20 border border-[#695CFF]'
+                    : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20'
                 }`}
         >
             {/* Avatar */}
@@ -274,8 +278,8 @@ function FriendItem({
             ) : (
                 <div
                     className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSelected
-                            ? 'bg-[#695CFF] border-[#695CFF]'
-                            : 'border-white/30'
+                        ? 'bg-[#695CFF] border-[#695CFF]'
+                        : 'border-white/30'
                         }`}
                 >
                     {isSelected && <div className="w-2 h-2 bg-white rounded-sm" />}

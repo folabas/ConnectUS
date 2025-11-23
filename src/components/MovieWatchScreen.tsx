@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import type { ComponentType, SVGProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Movie, RoomTheme, Screen, Room } from '../App';
@@ -390,7 +390,16 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     }
   };
 
-  if (!movie) return null;
+  if (!movie) {
+    return (
+      <div className="h-screen bg-[#0D0D0F] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-[#695CFF]" />
+          <p className="text-white/60">Loading session...</p>
+        </div>
+      </div>
+    );
+  }
 
   const participants = activeRoom?.participants || [];
 
@@ -417,6 +426,14 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               }}
               streamType="on-demand"
               autoPlay={false}
+              onLoadedMetadata={(e: any) => {
+                // Access the underlying video element for MuxPlayer
+                const muxVideoElement = e.target;
+                if (muxVideoElement && videoRef.current !== muxVideoElement) {
+                  // Store reference to the actual video element
+                  (videoRef as any).current = muxVideoElement;
+                }
+              }}
             />
           ) : (
             <video
@@ -681,7 +698,18 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
                             {isMe ? 'You' : (sender?.fullName || 'Unknown')}
                           </span>
                           <span className="text-xs text-white/40">
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {(() => {
+                              const now = Date.now();
+                              const msgTime = new Date(msg.timestamp).getTime();
+                              const diffMs = now - msgTime;
+                              const diffMins = Math.floor(diffMs / 60000);
+                              const diffHours = Math.floor(diffMs / 3600000);
+
+                              if (diffMins < 1) return 'just now';
+                              if (diffMins < 60) return `${diffMins}m ago`;
+                              if (diffHours < 24) return `${diffHours}h ago`;
+                              return new Date(msg.timestamp).toLocaleDateString();
+                            })()}
                           </span>
                         </div>
                         <div className={`px-4 py-3 rounded-2xl border ${isMe ? 'bg-white/10 border-white/20' : 'bg-white/5 border-white/10'}`}>

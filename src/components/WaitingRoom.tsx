@@ -61,20 +61,20 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     fetchRoom();
   }, [onNavigate, onRoomUpdate]);
 
-    // Listen for real-time room updates via Socket.io
+  // Listen for real-time room updates via Socket.io
   useEffect(() => {
-    const socket = signalingService.socket;
+    const socket = signalingService.connect(); // Ensure connection
     const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
     const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
 
     if (!socket || !currentRoomId || !userDataStr) return;
-    
+
     const userData = JSON.parse(userDataStr);
     const userId = userData.userId;
-    
+
     socket.emit('join-room', currentRoomId, userId);
     console.log('Emitted join-room:', currentRoomId, userId);
-    
+
     const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
       if (data.roomId === currentRoomId) {
         console.log('Room updated:', data);
@@ -95,6 +95,8 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       if (data.roomId === currentRoomId) {
         toast.success(data.message);
         setRoom(data.room);
+        // Navigate to watch screen when room starts
+        onNavigate('watch');
       }
     };
 
@@ -107,9 +109,34 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       socket.off('room-starting-soon', handleRoomStartingSoon);
       socket.off('room-started', handleRoomStarted);
     };
-  }, []);
+  }, [onNavigate]);
 
+  const handleStart = async () => {
+    try {
+      const token = tokenStorage.get();
+      if (!token || !room?._id) return;
 
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rooms/${room._id}/start`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        // Navigation happens via socket event 'room-started'
+        // But we can also navigate immediately for the host
+        onNavigate('watch');
+      } else {
+        toast.error(data.message || 'Failed to start session');
+      }
+    } catch (error) {
+      console.error("Failed to start room:", error);
+      toast.error('Failed to start session');
+    }
+  };
 
   const handleCopy = () => {
     if (room?.code) {
@@ -140,7 +167,11 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const maxParticipants = room?.maxParticipants || 4;
   const roomCode = room?.code || '---';
   const isPrivate = room?.type === 'private';
-  const inviteLink = typeof window !== 'undefined' ? `${window.location.host}/join/${roomCode}` : `connectus.app/join/${roomCode}`;
+  const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/join/${roomCode}` : `connectus.live/join/${roomCode}`;
+
+  // Safe user access
+  const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('userData') || '{}') : {};
+  const isHost = room?.host?._id === currentUser.userId;
 
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white">
@@ -241,105 +272,95 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center text-lg font-medium">
                             {participant.fullName ? participant.fullName.substring(0, 2).toUpperCase() : '??'}
                           </div>
-                          <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-[#0D0D0F] bg-green-500`} />
+                          <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-[#0D0D0F]" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="truncate">{participant.fullName || 'Unknown User'}</p>
-                          <p className="text-xs text-white/40">Online</p>
+                        <div>
+                          <p className="font-medium">{participant.fullName || 'Unknown User'}</p>
+                          <p className="text-xs text-white/40">{participant._id === room.host._id ? 'Host' : 'Viewer'}</p>
                         </div>
                       </motion.div>
                     ))
                   ) : (
-                    <div className="col-span-2 text-center text-white/40 py-4">Waiting for participants...</div>
+                    <p className="text-white/40 col-span-2 text-center py-4">Waiting for participants...</p>
                   )}
                 </div>
               </div>
+            </motion.div>
 
-              {/* Controls */}
-              <div className="flex items-center justify-between p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
-                <div className="flex items-center gap-3">
+            {/* Right - Movie Info & Controls */}
+            <motion.div
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-6"
+            >
+              <div className="p-6 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10">
+                <div className="aspect-video rounded-2xl overflow-hidden mb-4 relative group">
+                  <ImageWithFallback
+                    src={displayMovie.image}
+                    alt={displayMovie.title}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Play className="w-12 h-12 text-white fill-white" />
+                  </div>
+                </div>
+                <h2 className="text-xl font-bold mb-1">{displayMovie.title}</h2>
+                <div className="flex items-center gap-3 text-sm text-white/60 mb-6">
+                  <span>{displayMovie.duration}</span>
+                  <span>•</span>
+                  <span>{displayMovie.genre}</span>
+                  <span>•</span>
+                  <span>{displayMovie.rating}</span>
+                </div>
+
+                {/* Media Controls Preview */}
+                <div className="flex gap-3 mb-6">
                   <button
                     onClick={() => setMicOn(!micOn)}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${micOn
-                      ? 'bg-white/10 hover:bg-white/20'
-                      : 'bg-red-500/20 hover:bg-red-500/30'
+                    className={`flex-1 h-12 rounded-2xl flex items-center justify-center transition-colors ${micOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
                       }`}
                   >
                     {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                   </button>
                   <button
                     onClick={() => setVideoOn(!videoOn)}
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${videoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 hover:bg-red-500/30'}`}
+                    className={`flex-1 h-12 rounded-2xl flex items-center justify-center transition-colors ${videoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'
+                      }`}
                   >
                     {videoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                   </button>
                 </div>
 
-                <Button
-                  onClick={() => onNavigate('watch')}
-                  className="text-white rounded-full px-8 gap-2"
-                  style={{
-                    background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
-                  }}
-                >
-                  <Play className="w-4 h-4" />
-                  Start Session
-                </Button>
-              </div>
-            </motion.div>
-
-            {/* Right - Movie Preview */}
-            <motion.div
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="lg:col-span-1"
-            >
-              <div className="sticky top-8 p-6 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10">
-                <div className="mb-4">
-                  <p className="text-sm text-white/60 mb-2">Now Playing</p>
-                  <h2 className="text-xl tracking-tight">{displayMovie.title}</h2>
-                </div>
-
-                <div className="relative aspect-video rounded-2xl overflow-hidden mb-4 bg-white/5">
-                  <ImageWithFallback
-                    src={displayMovie.image}
-                    alt={displayMovie.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">Duration</span>
-                    <span>{displayMovie.duration}</span>
+                {/* Start Button (Only for Host) */}
+                {isHost ? (
+                  <Button
+                    onClick={handleStart}
+                    className="w-full h-14 text-lg font-medium rounded-2xl shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all"
+                    style={{
+                      background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
+                    }}
+                  >
+                    Start Session
+                  </Button>
+                ) : (
+                  <div className="text-center p-4 rounded-2xl bg-white/5 text-white/60">
+                    Waiting for host to start...
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">Rating</span>
-                    <span>★ {displayMovie.rating}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/60">Genre</span>
-                    <span>{displayMovie.genre}</span>
-                  </div>
-                  {participants.length >= maxParticipants && (
-                    <div className="mt-3 text-xs text-red-400">Room is at capacity ({maxParticipants})
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </motion.div>
           </div>
         </div>
       </div>
-      {/* Invite Friends Modal */}
-      {room && (
-        <InviteFriendsModal
-          isOpen={showInviteModal}
-          onClose={() => setShowInviteModal(false)}
-          roomId={room._id}
-        />
-      )}
+
+      {/* Invite Modal */}
+      <InviteFriendsModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        roomId={room?._id}
+        roomCode={room?.code}
+      />
     </div>
   );
 }

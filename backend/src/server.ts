@@ -34,6 +34,9 @@ const io = new Server(httpServer, {
     }
 });
 
+// Make io accessible to our router
+app.set('io', io);
+
 // CORS Middleware - MUST be FIRST
 app.use(cors({
     origin: [
@@ -51,24 +54,11 @@ app.use(cors({
     ]
 }));
 
-// Universal OPTIONS handler (Fix for Express 5)
-app.use((req, res, next) => {
-    if (req.method === "OPTIONS") {
-        res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-        res.header("Access-Control-Allow-Credentials", "true");
-        res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-        res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, X-Requested-With");
-        return res.sendStatus(200);
-    }
-    next();
-});
-
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ... (rest of middleware)
 
 // Socket.io Signaling Logic
 const userSockets = new Map<string, string>(); // userId -> socketId
+const socketToUser = new Map<string, string>(); // socketId -> userId (Reverse map for O(1) lookup)
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -76,6 +66,7 @@ io.on('connection', (socket) => {
     // User online status
     socket.on('user-online', async (userId: string) => {
         userSockets.set(userId, socket.id);
+        socketToUser.set(socket.id, userId); // Add to reverse map
         await User.findByIdAndUpdate(userId, { onlineStatus: 'online', lastSeen: new Date() });
 
         // Notify friends
@@ -99,48 +90,80 @@ io.on('connection', (socket) => {
     socket.on('join-room', async (roomId, userId) => {
         socket.join(roomId);
 
-        // Update room participants in database
+        // Update room participants in database using atomic operator
         try {
-            const room = await Room.findById(roomId);
-            if (room && !room.participants.includes(userId)) {
-                room.participants.push(userId);
-                await room.save();
+            // Use $addToSet to prevent race conditions and duplicates
+            const updatedRoom = await Room.findByIdAndUpdate(
+                roomId,
+                { $addToSet: { participants: userId } },
+                { new: true }
+            ).populate('participants', 'fullName avatarUrl');
 
-                // Populate participants before emitting
-                const updatedRoom = await Room.findById(roomId)
-                    .populate('participants', 'fullName avatarUrl');
-
-                if (updatedRoom) {
-                    // Emit updated room data to all users in the room
-                    io.to(roomId).emit('room-updated', {
-                        roomId,
-                        participantCount: updatedRoom.participants.length,
-                        participants: updatedRoom.participants
-                    });
-                }
+            if (updatedRoom) {
+                // Emit updated room data to all users in the room
+                io.to(roomId).emit('room-updated', {
+                    roomId,
+                    participantCount: updatedRoom.participants.length,
+                    participants: updatedRoom.participants
+                });
             }
         } catch (error) {
             console.error('Error updating room participants:', error);
         }
 
-        socket.to(roomId).emit('user-connected', userId);
-        console.log(`User ${userId} joined room ${roomId}`);
+        // FIX: Send list of existing users to the new user
+        const sockets = await io.in(roomId).fetchSockets();
+        const existingParticipants = sockets
+            .filter(s => s.id !== socket.id)
+            .map(s => ({
+                socketId: s.id,
+                userId: socketToUser.get(s.id) || 'unknown'
+            }));
+
+        socket.emit('existing-participants', existingParticipants);
+
+        // FIX: Emit object with socketId so frontend can create peer connection
+        socket.to(roomId).emit('user-connected', {
+            userId,
+            socketId: socket.id
+        });
+        console.log(`User ${userId} joined room ${roomId} (socket ${socket.id})`);
 
         socket.on('disconnect', () => {
-            socket.to(roomId).emit('user-disconnected', userId);
+            socket.to(roomId).emit('user-disconnected', { userId, socketId: socket.id });
         });
     });
 
+    // Forward signaling payloads with senderSocketId
     socket.on('offer', (payload) => {
-        io.to(payload.target).emit('offer', payload);
+        // Payload should include: targetSocketId, sdp, sender (userId)
+        const target = payload.targetSocketId || payload.target;
+        if (!target) return;
+
+        io.to(target).emit('offer', {
+            ...payload,
+            senderSocketId: socket.id // FIX: Add sender's socket ID
+        });
     });
 
     socket.on('answer', (payload) => {
-        io.to(payload.target).emit('answer', payload);
+        const target = payload.targetSocketId || payload.target;
+        if (!target) return;
+
+        io.to(target).emit('answer', {
+            ...payload,
+            senderSocketId: socket.id
+        });
     });
 
     socket.on('ice-candidate', (payload) => {
-        io.to(payload.target).emit('ice-candidate', payload);
+        const target = payload.targetSocketId || payload.target;
+        if (!target) return;
+
+        io.to(target).emit('ice-candidate', {
+            ...payload,
+            senderSocketId: socket.id
+        });
     });
 
     socket.on('chat-message', (payload) => {
@@ -180,17 +203,14 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', async () => {
-        // Find user by socket ID
-        let disconnectedUserId: string | null = null;
-        for (const [userId, socketId] of userSockets.entries()) {
-            if (socketId === socket.id) {
-                disconnectedUserId = userId;
-                userSockets.delete(userId);
-                break;
-            }
-        }
+        // Optimized disconnect handling using reverse map O(1)
+        const disconnectedUserId = socketToUser.get(socket.id);
 
         if (disconnectedUserId) {
+            // Clean up maps
+            userSockets.delete(disconnectedUserId);
+            socketToUser.delete(socket.id);
+
             await User.findByIdAndUpdate(disconnectedUserId, {
                 onlineStatus: 'offline',
                 lastSeen: new Date()
