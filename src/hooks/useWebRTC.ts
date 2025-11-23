@@ -15,18 +15,16 @@ export interface ChatMessage {
 }
 
 const ICE_SERVERS = {
-  iceServers: [
-    {
-      urls: [
-        "stun:global.stun.openrelay.metered.ca:3478",
-        "turn:global.turn.openrelay.metered.ca:80",
-        "turn:global.turn.openrelay.metered.ca:443",
-        "turn:global.turn.openrelay.metered.ca:3478"
-      ],
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    }
-  ]
+    iceServers: [
+        {
+            urls: ["turn:global.turn.twilio.com:3478?transport=udp"],
+            username: "twilio",
+            credential: "twilio"
+        },
+        {
+            urls: "stun:stun.l.google.com:19302"
+        }
+    ]
 };
 
 
