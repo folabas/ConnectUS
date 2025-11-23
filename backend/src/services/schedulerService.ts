@@ -5,8 +5,8 @@ import type { Server } from 'socket.io';
 let io: Server;
 
 class SchedulerService {
-    private task: cron.ScheduledTask | null = null;
-
+    private task: any | null = null;
+    
     setIo(ioInstance: Server) {
         io = ioInstance;
     }
