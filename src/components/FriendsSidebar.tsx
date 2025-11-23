@@ -4,6 +4,7 @@ import { Users, UserPlus, X, Loader2, Circle, Check, User } from 'lucide-react';
 import { friendApi, tokenStorage } from '@/services/api';
 import { toast } from 'sonner';
 import { AddFriendModal } from './AddFriendModal';
+import { signalingService } from '@/services/signaling';
 
 interface Friend {
     _id: string;
@@ -43,6 +44,38 @@ export function FriendsSidebar({ isOpen, onClose }: FriendsSidebarProps) {
             fetchData();
         }
     }, [isOpen]);
+
+    // Socket listeners for real-time friend status updates
+    useEffect(() => {
+        const socket = signalingService.socket;
+        if (!socket) return;
+
+        const handleFriendOnline = (friendUserId: string) => {
+            console.log('Friend came online:', friendUserId);
+            setFriends(prev => prev.map(friend =>
+                friend._id === friendUserId
+                    ? { ...friend, onlineStatus: 'online' as const }
+                    : friend
+            ));
+        };
+
+        const handleFriendOffline = (friendUserId: string) => {
+            console.log('Friend went offline:', friendUserId);
+            setFriends(prev => prev.map(friend =>
+                friend._id === friendUserId
+                    ? { ...friend, onlineStatus: 'offline' as const }
+                    : friend
+            ));
+        };
+
+        socket.on('friend-online', handleFriendOnline);
+        socket.on('friend-offline', handleFriendOffline);
+
+        return () => {
+            socket.off('friend-online', handleFriendOnline);
+            socket.off('friend-offline', handleFriendOffline);
+        };
+    }, []);
 
     const fetchData = async () => {
         setLoading(true);

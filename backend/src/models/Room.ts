@@ -12,10 +12,12 @@ export interface IRoom extends Document {
         name: string;
     };
     startTime?: string;
+    scheduledStartTime?: Date;
+    notificationSent?: boolean;
     maxParticipants: number;
     adminEnabled: boolean;
     participants: mongoose.Types.ObjectId[];
-    status: 'waiting' | 'playing' | 'finished';
+    status: 'waiting' | 'scheduled' | 'active' | 'playing' | 'finished';
     createdAt: Date;
     updatedAt: Date;
 }
@@ -55,6 +57,13 @@ const roomSchema = new Schema<IRoom>(
         startTime: {
             type: String,
         },
+        scheduledStartTime: {
+            type: Date,
+        },
+        notificationSent: {
+            type: Boolean,
+            default: false,
+        },
         maxParticipants: {
             type: Number,
             default: 4,
@@ -72,7 +81,7 @@ const roomSchema = new Schema<IRoom>(
         ],
         status: {
             type: String,
-            enum: ['waiting', 'playing', 'finished'],
+            enum: ['waiting', 'scheduled', 'active', 'playing', 'finished'],
             default: 'waiting',
         },
     },

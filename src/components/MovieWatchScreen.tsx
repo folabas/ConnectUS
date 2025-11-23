@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import type { ComponentType, SVGProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Movie, RoomTheme, Screen, Room } from '../App';
 import { roomApi, tokenStorage, userStorage } from '@/services/api';
 import { useWebRTC } from '@/hooks/useWebRTC';
+import { signalingService } from '@/services/signaling';
+import { toast } from 'sonner';
 
 interface MovieWatchScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -53,16 +55,21 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const [activeRoom, setActiveRoom] = useState<Room | null>(currentRoom || null);
   const [chatInput, setChatInput] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reactionIdRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isSyncingRef = useRef(false);
 
   const user = userStorage.get();
   const userId = user?.userId || null;
   const roomId = activeRoom?._id || (typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null);
+  const isHost = activeRoom?.host?._id === userId || (activeRoom?.host as any) === userId;
+  const isAdminEnabled = activeRoom?.adminEnabled || false;
+  const canControl = !isAdminEnabled || isHost;
 
   const { localStream, peers, messages, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
 
@@ -92,6 +99,89 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
     fetchRoom();
   }, [activeRoom]);
+
+  // Video synchronization socket listeners
+  useEffect(() => {
+    if (!roomId) return;
+
+    const socket = signalingService.socket;
+    if (!socket) return;
+
+    socket.on('video-play', (payload: any) => {
+      if (payload.roomId === roomId && videoRef.current && !isSyncingRef.current) {
+        isSyncingRef.current = true;
+        videoRef.current.currentTime = payload.currentTime;
+        videoRef.current.play();
+        setIsPlaying(true);
+        setTimeout(() => { isSyncingRef.current = false; }, 100);
+      }
+    });
+
+    socket.on('video-pause', (payload: any) => {
+      if (payload.roomId === roomId && videoRef.current && !isSyncingRef.current) {
+        isSyncingRef.current = true;
+        videoRef.current.currentTime = payload.currentTime;
+        videoRef.current.pause();
+        setIsPlaying(false);
+        setTimeout(() => { isSyncingRef.current = false; }, 100);
+      }
+    });
+
+    socket.on('video-seek', (payload: any) => {
+      if (payload.roomId === roomId && videoRef.current && !isSyncingRef.current) {
+        isSyncingRef.current = true;
+        videoRef.current.currentTime = payload.currentTime;
+        setTimeout(() => { isSyncingRef.current = false; }, 100);
+      }
+    });
+
+    socket.on('video-sync-request', (payload: any) => {
+      // If we're the host, send current state
+      if (isHost && videoRef.current) {
+        socket.emit('video-sync-response', {
+          roomId,
+          currentTime: videoRef.current.currentTime,
+          isPlaying: !videoRef.current.paused
+        });
+      }
+    });
+
+    socket.on('video-sync-response', (payload: any) => {
+      if (payload.roomId === roomId && videoRef.current) {
+        videoRef.current.currentTime = payload.currentTime;
+        if (payload.isPlaying) {
+          videoRef.current.play();
+          setIsPlaying(true);
+        }
+      }
+    });
+
+    socket.on('reaction', (payload: any) => {
+      if (payload.roomId === roomId) {
+        // Show reaction from other user
+        const reactionData = reactions.find(r => r.name === payload.reaction);
+        if (reactionData) {
+          addReaction(reactionData.icon, reactionData.color);
+        }
+      }
+    });
+
+    // Request sync when joining
+    if (!isHost) {
+      setTimeout(() => {
+        socket.emit('video-sync-request', { roomId });
+      }, 1000);
+    }
+
+    return () => {
+      socket.off('video-play');
+      socket.off('video-pause');
+      socket.off('video-seek');
+      socket.off('video-sync-request');
+      socket.off('video-sync-response');
+      socket.off('reaction');
+    };
+  }, [roomId, isHost]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -135,15 +225,32 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   }, [movie]);
 
   const togglePlay = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (isPlaying) {
-      video.pause();
-    } else {
-      video.play();
+    if (!canControl) {
+      toast.error('Only the host can control playback');
+      return;
     }
-    setIsPlaying(!isPlaying);
+
+    const video = videoRef.current;
+    if (!video || isSyncingRef.current) return;
+
+    const newIsPlaying = !isPlaying;
+    if (newIsPlaying) {
+      video.play();
+    } else {
+      video.pause();
+    }
+    setIsPlaying(newIsPlaying);
+
+    // Broadcast to other users
+    if (roomId) {
+      const socket = signalingService.socket;
+      if (socket) {
+        socket.emit(newIsPlaying ? 'video-play' : 'video-pause', {
+          roomId,
+          currentTime: video.currentTime
+        });
+      }
+    }
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,10 +290,26 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canControl) {
+      toast.error('Only the host can seek');
+      return;
+    }
+
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
-    if (videoRef.current) {
+    if (videoRef.current && !isSyncingRef.current) {
       videoRef.current.currentTime = time;
+
+      // Broadcast seek to other users
+      if (roomId) {
+        const socket = signalingService.socket;
+        if (socket) {
+          socket.emit('video-seek', {
+            roomId,
+            currentTime: time
+          });
+        }
+      }
     }
   };
 
@@ -218,7 +341,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     }, 3000);
   };
 
-  const addReaction = (icon: ComponentType<SVGProps<SVGSVGElement>>, color: string) => {
+  const addReaction = (icon: ComponentType<SVGProps<SVGSVGElement>>, color: string, reactionName?: string) => {
     const id = ++reactionIdRef.current;
     const newReaction: FloatingReaction = {
       id,
@@ -230,6 +353,28 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== newReaction.id));
     }, 3000);
+
+    // Broadcast reaction to other users
+    if (reactionName && roomId) {
+      const socket = signalingService.socket;
+      if (socket) {
+        socket.emit('reaction', {
+          roomId,
+          reaction: reactionName,
+          userId
+        });
+      }
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (activeRoom?.code) {
+      const link = `${window.location.origin}/join/${activeRoom.code}`;
+      navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success('Room link copied!');
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleSendMessage = () => {
@@ -280,6 +425,33 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               src={movie.videoUrl}
               onClick={togglePlay}
             />
+          )}
+
+          {/* Top Left - Room Code */}
+          {activeRoom?.code && (
+            <div className="absolute top-6 left-6 flex gap-2 z-50">
+              <div className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
+                <span className="text-sm text-white/60">Room Code:</span>
+                <span className="text-sm font-mono">{activeRoom.code}</span>
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 transition-colors flex items-center gap-2"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                <span className="text-sm">{copied ? 'Copied!' : 'Copy Link'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Admin Control Indicator */}
+          {isAdminEnabled && !canControl && (
+            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50">
+              <div className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-yellow-500" />
+                <span className="text-sm text-white/80">Host is controlling playback</span>
+              </div>
+            </div>
           )}
 
           {/* Top Right Controls and Participants */}
@@ -366,7 +538,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
                   key={index}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => addReaction(reaction.icon, reaction.color)}
+                  onClick={() => addReaction(reaction.icon, reaction.color, reaction.name)}
                   className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
                 >
                   <ReactionIcon className={`w-5 h-5 ${reaction.color}`} />

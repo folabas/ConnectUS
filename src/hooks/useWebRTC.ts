@@ -3,6 +3,7 @@ import { signalingService } from '../services/signaling';
 
 export interface Peer {
     userId: string;
+    socketId: string;
     stream: MediaStream;
 }
 
@@ -25,27 +26,36 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
     const [peers, setPeers] = useState<Peer[]>([]);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-    const peersRef = useRef<{ [key: string]: RTCPeerConnection }>({});
+    const peersRef = useRef<{ [socketId: string]: RTCPeerConnection }>({});
     const localStreamRef = useRef<MediaStream | null>(null);
 
-    const createPeerConnection = useCallback((targetUserId: string, currentUserId: string) => {
+    const createPeerConnection = useCallback((peerSocketId: string, peerUserId: string) => {
         const pc = new RTCPeerConnection(STUN_SERVERS);
 
         pc.onicecandidate = (event) => {
             if (event.candidate) {
                 signalingService.sendIceCandidate({
-                    target: targetUserId,
+                    roomId: roomId!,
+                    targetSocketId: peerSocketId,
                     candidate: event.candidate,
-                    sender: currentUserId
+                    sender: userId!
                 });
             }
         };
 
         pc.ontrack = (event) => {
+            console.log('Received remote track from:', peerUserId);
             setPeers(prev => {
-                if (prev.find(p => p.userId === targetUserId)) return prev;
-                return [...prev, { userId: targetUserId, stream: event.streams[0] }];
+                if (prev.find(p => p.socketId === peerSocketId)) return prev;
+                return [...prev, { userId: peerUserId, socketId: peerSocketId, stream: event.streams[0] }];
             });
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log(`Connection state with ${peerUserId}:`, pc.connectionState);
+            if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+                console.warn(`Connection ${pc.connectionState} with peer ${peerUserId}`);
+            }
         };
 
         if (localStreamRef.current) {
@@ -56,9 +66,9 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
             });
         }
 
-        peersRef.current[targetUserId] = pc;
+        peersRef.current[peerSocketId] = pc;
         return pc;
-    }, []);
+    }, [roomId, userId]);
 
     useEffect(() => {
         if (!roomId || !userId) return;
@@ -80,50 +90,58 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                 const socket = signalingService.connect();
                 signalingService.joinRoom(roomId, userId);
 
-                socket.on('user-connected', async (newUserId: string) => {
-                    console.log('User connected:', newUserId);
-                    const pc = createPeerConnection(newUserId, userId);
+                socket.on('user-connected', async (data: { userId: string; socketId: string }) => {
+                    console.log('User connected:', data.userId, 'Socket:', data.socketId);
+                    const pc = createPeerConnection(data.socketId, data.userId);
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
                     signalingService.sendOffer({
-                        target: newUserId,
+                        roomId,
+                        targetSocketId: data.socketId,
                         sdp: offer,
                         sender: userId
                     });
                 });
 
                 socket.on('offer', async (payload: any) => {
-                    const pc = createPeerConnection(payload.sender, userId);
+                    console.log('Received offer from:', payload.sender);
+                    const pc = createPeerConnection(payload.senderSocketId, payload.sender);
                     await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
                     signalingService.sendAnswer({
-                        target: payload.sender,
+                        roomId,
+                        targetSocketId: payload.senderSocketId,
                         sdp: answer,
                         sender: userId
                     });
                 });
 
                 socket.on('answer', async (payload: any) => {
-                    const pc = peersRef.current[payload.sender];
+                    console.log('Received answer from:', payload.sender);
+                    const pc = peersRef.current[payload.senderSocketId];
                     if (pc) {
                         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
                     }
                 });
 
                 socket.on('ice-candidate', async (payload: any) => {
-                    const pc = peersRef.current[payload.sender];
+                    const pc = peersRef.current[payload.senderSocketId];
                     if (pc && payload.candidate) {
                         await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
                     }
                 });
 
                 socket.on('user-disconnected', (disconnectedUserId: string) => {
-                    if (peersRef.current[disconnectedUserId]) {
-                        peersRef.current[disconnectedUserId].close();
-                        delete peersRef.current[disconnectedUserId];
-                        setPeers(prev => prev.filter(p => p.userId !== disconnectedUserId));
-                    }
+                    // Find and close the peer connection by userId
+                    Object.entries(peersRef.current).forEach(([socketId, pc]) => {
+                        const peer = peers.find(p => p.socketId === socketId);
+                        if (peer && peer.userId === disconnectedUserId) {
+                            pc.close();
+                            delete peersRef.current[socketId];
+                        }
+                    });
+                    setPeers(prev => prev.filter(p => p.userId !== disconnectedUserId));
                 });
 
                 socket.on('chat-message', (message: ChatMessage) => {

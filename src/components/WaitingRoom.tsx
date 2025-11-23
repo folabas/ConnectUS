@@ -61,19 +61,20 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     fetchRoom();
   }, [onNavigate, onRoomUpdate]);
 
-  // Listen for real-time room updates via Socket.io
+    // Listen for real-time room updates via Socket.io
   useEffect(() => {
     const socket = signalingService.socket;
     const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
     const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
 
     if (!socket || !currentRoomId || !userDataStr) return;
-    // Parse user data to get userId
+    
     const userData = JSON.parse(userDataStr);
     const userId = userData.userId;
-    // Emit join-room event to notify backend
+    
     socket.emit('join-room', currentRoomId, userId);
     console.log('Emitted join-room:', currentRoomId, userId);
+    
     const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
       if (data.roomId === currentRoomId) {
         console.log('Room updated:', data);
@@ -83,11 +84,32 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
         } : null);
       }
     };
+
+    const handleRoomStartingSoon = (data: { roomId: string; message: string; startTime: string }) => {
+      if (data.roomId === currentRoomId) {
+        toast.info(data.message, { duration: 10000 });
+      }
+    };
+
+    const handleRoomStarted = (data: { roomId: string; message: string; room: any }) => {
+      if (data.roomId === currentRoomId) {
+        toast.success(data.message);
+        setRoom(data.room);
+      }
+    };
+
     socket.on('room-updated', handleRoomUpdate);
+    socket.on('room-starting-soon', handleRoomStartingSoon);
+    socket.on('room-started', handleRoomStarted);
+
     return () => {
       socket.off('room-updated', handleRoomUpdate);
+      socket.off('room-starting-soon', handleRoomStartingSoon);
+      socket.off('room-started', handleRoomStarted);
     };
   }, []);
+
+
 
   const handleCopy = () => {
     if (room?.code) {

@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import { Room } from '../models/Room';
 import { User } from '../models/User';
+import { Movie } from '../models/Movie';  // Add this line
 import { AuthRequest } from '../middleware/auth';
 import crypto from 'crypto';
+import { emailService } from '../services/emailService';
 
 // Helper to generate random room code
 const generateRoomCode = (): string => {
@@ -32,6 +34,21 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
             }
         }
 
+        // Parse scheduled start time if provided
+        let scheduledStartTime: Date | undefined;
+        let roomStatus: 'waiting' | 'scheduled' = 'waiting';
+
+        if (startTime) {
+            const parsedTime = new Date(startTime);
+            const now = new Date();
+
+            // If start time is in the future, set as scheduled
+            if (parsedTime > now) {
+                scheduledStartTime = parsedTime;
+                roomStatus = 'scheduled';
+            }
+        }
+
         const room = await Room.create({
             name,
             host: userId as any,
@@ -40,9 +57,11 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
             code,
             theme,
             startTime,
+            scheduledStartTime,
             maxParticipants,
             adminEnabled,
             participants: [userId as any], // Host is automatically a participant
+            status: roomStatus,
         });
 
         // Increment sessions hosted
@@ -192,6 +211,60 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             success: false,
             message: 'Server error',
             error: error.message,
+        });
+    }
+
+};
+export const inviteToRoom = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { roomId, emails } = req.body;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const room = await Room.findById(roomId).populate('host');
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // Check if user is host
+        if (room.host._id.toString() !== userId) {
+            res.status(403).json({ success: false, message: 'Only host can send invites' });
+            return;
+        }
+
+        const user = await User.findById(userId);
+        const inviterName = user?.fullName || 'A friend';
+
+        // Send emails
+        // Send emails
+        const movie = await Movie.findById(room.movie);
+        const movieTitle = movie?.title || 'a movie';
+
+        for (const email of emails) {
+            await emailService.sendRoomInvite({
+                toEmail: email,
+                toName: email.split('@')[0], // Use email username as name
+                fromName: inviterName,
+                movieTitle: movieTitle,
+                roomCode: room.code,
+                roomId: room._id.toString()
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Invitations sent to ${emails.length} email(s)`
+        });
+    } catch (error: any) {
+        console.error('Invite error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to send invitations'
         });
     }
 };

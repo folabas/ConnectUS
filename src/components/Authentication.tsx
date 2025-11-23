@@ -53,7 +53,16 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
           });
 
           toast.success('Welcome back!');
-          onAuth();
+
+          // Check for pending redirect (e.g., from join link)
+          const redirectPath = typeof window !== 'undefined' ? localStorage.getItem('redirectAfterAuth') : null;
+          if (redirectPath) {
+            localStorage.removeItem('redirectAfterAuth');
+            // Use window.location for full page navigation
+            window.location.href = redirectPath;
+          } else {
+            onAuth();
+          }
         } else {
           toast.error(response.message || 'Login failed');
         }
@@ -76,7 +85,16 @@ export function Authentication({ onNavigate, onAuth }: AuthenticationProps) {
           });
 
           toast.success('Account created successfully!');
-          onAuth();
+
+          // Check for pending redirect (e.g., from join link)
+          const redirectPath = typeof window !== 'undefined' ? localStorage.getItem('redirectAfterAuth') : null;
+          if (redirectPath) {
+            localStorage.removeItem('redirectAfterAuth');
+            // Use window.location for full page navigation
+            window.location.href = redirectPath;
+          } else {
+            onAuth();
+          }
         } else {
           toast.error(response.message || 'Registration failed');
         }

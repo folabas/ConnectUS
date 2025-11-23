@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notificationRoutes';
 import { User } from './models/User';
 import { Friend } from './models/Friend';
 import { Room } from './models/Room';
+import { schedulerService } from './services/schedulerService';
 
 // Create Express app
 const app: Application = express();
@@ -217,6 +218,12 @@ const startServer = async () => {
     try {
         // Connect to database
         await connectDB();
+
+
+        // Start room scheduler
+        schedulerService.setIo(io);
+        schedulerService.start();
+        console.log('📅 Room scheduler started');
 
         // Start listening
         httpServer.listen(PORT, () => {

@@ -19,12 +19,16 @@
     "license": "ISC",
     "dependencies": {
         "@mux/mux-node": "^12.8.0",
+        "@types/node-cron": "^3.0.11",
+        "@types/nodemailer": "^7.0.4",
         "bcryptjs": "^3.0.3",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",
         "express": "^5.1.0",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^9.0.0",
+        "node-cron": "^4.2.1",
+        "nodemailer": "^7.0.10",
         "resend": "^6.5.2",
         "socket.io": "^4.8.1"
     },

@@ -5,10 +5,11 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Movie, Screen } from '../App';
-import { movieApi } from '@/services/api';
+import { movieApi, userStorage } from '@/services/api';
 import { toast } from 'sonner';
 import { UploadMovieModal } from './UploadMovieModal';
 import { FriendsSidebar } from './FriendsSidebar';
+import { signalingService } from '@/services/signaling';
 
 
 interface MovieLibraryProps {
@@ -62,6 +63,24 @@ export function MovieLibrary({ onNavigate, onMovieSelect }: MovieLibraryProps) {
 
     return () => clearTimeout(timeoutId);
   }, [selectedCategory, searchQuery]);
+
+  // Emit user-online status when component mounts
+  useEffect(() => {
+    const socket = signalingService.connect();
+    const user = userStorage.get();
+
+    if (user?.userId && socket) {
+      socket.emit('user-online', user.userId);
+      console.log('Emitted user-online:', user.userId);
+    }
+
+    // Emit user-offline on unmount
+    return () => {
+      if (user?.userId && socket) {
+        socket.emit('user-offline', user.userId);
+      }
+    };
+  }, []);
 
   const handleMovieClick = (movie: Movie) => {
     onMovieSelect(movie);
