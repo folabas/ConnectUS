@@ -145,11 +145,8 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                 });
 
                 socket.on('chat-message', (message: ChatMessage) => {
-                    setMessages(prev => {
-                        if (prev.some(m => m.id === message.id)) return prev;
-                        return [...prev, message];
-                    });
-                });
+    setMessages(prev => [...prev, message]);
+});
 
             } catch (err) {
                 console.error('Error accessing media devices:', err);

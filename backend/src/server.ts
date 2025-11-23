@@ -153,6 +153,32 @@ io.on('connection', (socket) => {
         io.to(payload.roomId).emit('chat-message', message);
     });
 
+    // Video synchronization events
+    socket.on('video-play', (payload) => {
+        socket.to(payload.roomId).emit('video-play', payload);
+    });
+
+    socket.on('video-pause', (payload) => {
+        socket.to(payload.roomId).emit('video-pause', payload);
+    });
+
+    socket.on('video-seek', (payload) => {
+        socket.to(payload.roomId).emit('video-seek', payload);
+    });
+
+    socket.on('video-sync-request', (payload) => {
+        socket.to(payload.roomId).emit('video-sync-request', payload);
+    });
+
+    socket.on('video-sync-response', (payload) => {
+        socket.to(payload.roomId).emit('video-sync-response', payload);
+    });
+
+    // Reaction events
+    socket.on('reaction', (payload) => {
+        socket.to(payload.roomId).emit('reaction', payload);
+    });
+
     socket.on('disconnect', async () => {
         // Find user by socket ID
         let disconnectedUserId: string | null = null;
