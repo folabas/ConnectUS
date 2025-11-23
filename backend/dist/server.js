@@ -18,6 +18,7 @@ const friendRoutes_1 = __importDefault(require("./routes/friendRoutes"));
 const notificationRoutes_1 = __importDefault(require("./routes/notificationRoutes"));
 const User_1 = require("./models/User");
 const Friend_1 = require("./models/Friend");
+const Room_1 = require("./models/Room");
 // Create Express app
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
@@ -84,8 +85,25 @@ io.on('connection', (socket) => {
             }
         });
     });
-    socket.on('join-room', (roomId, userId) => {
+    socket.on('join-room', async (roomId, userId) => {
         socket.join(roomId);
+        // Update room participants in database
+        try {
+            const room = await Room_1.Room.findById(roomId);
+            if (room && !room.participants.includes(userId)) {
+                room.participants.push(userId);
+                await room.save();
+                // Emit updated room data to all users in the room
+                io.to(roomId).emit('room-updated', {
+                    roomId,
+                    participantCount: room.participants.length,
+                    participants: room.participants
+                });
+            }
+        }
+        catch (error) {
+            console.error('Error updating room participants:', error);
+        }
         socket.to(roomId).emit('user-connected', userId);
         console.log(`User ${userId} joined room ${roomId}`);
         socket.on('disconnect', () => {

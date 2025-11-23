@@ -7,7 +7,7 @@ import { Movie, RoomTheme, Screen } from '../App';
 import { roomApi, tokenStorage } from '@/services/api';
 import { toast } from 'sonner';
 import { InviteFriendsModal } from './InviteFriendsModal';
-
+import { signalingService } from '@/services/signaling';
 
 interface WaitingRoomProps {
   onNavigate: (screen: Screen) => void;
@@ -62,32 +62,32 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   }, [onNavigate, onRoomUpdate]);
 
   // Listen for real-time room updates via Socket.io
-useEffect(() => {
-  const socket = (window as any).socket;
-  const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
-  const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
-  
-  if (!socket || !currentRoomId || !userDataStr) return;
-  // Parse user data to get userId
-  const userData = JSON.parse(userDataStr);
-  const userId = userData.userId;
-  // Emit join-room event to notify backend
-  socket.emit('join-room', currentRoomId, userId);
-  console.log('Emitted join-room:', currentRoomId, userId);
-  const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
-    if (data.roomId === currentRoomId) {
-      console.log('Room updated:', data);
-      setRoom((prev: any) => prev ? {
-        ...prev,
-        participants: data.participants
-      } : null);
-    }
-  };
-  socket.on('room-updated', handleRoomUpdate);
-  return () => {
-    socket.off('room-updated', handleRoomUpdate);
-  };
-}, []);
+  useEffect(() => {
+    const socket = signalingService.socket;
+    const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
+    const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
+
+    if (!socket || !currentRoomId || !userDataStr) return;
+    // Parse user data to get userId
+    const userData = JSON.parse(userDataStr);
+    const userId = userData.userId;
+    // Emit join-room event to notify backend
+    socket.emit('join-room', currentRoomId, userId);
+    console.log('Emitted join-room:', currentRoomId, userId);
+    const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
+      if (data.roomId === currentRoomId) {
+        console.log('Room updated:', data);
+        setRoom((prev: any) => prev ? {
+          ...prev,
+          participants: data.participants
+        } : null);
+      }
+    };
+    socket.on('room-updated', handleRoomUpdate);
+    return () => {
+      socket.off('room-updated', handleRoomUpdate);
+    };
+  }, []);
 
   const handleCopy = () => {
     if (room?.code) {
