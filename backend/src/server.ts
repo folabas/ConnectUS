@@ -106,12 +106,18 @@ io.on('connection', (socket) => {
                 room.participants.push(userId);
                 await room.save();
 
-                // Emit updated room data to all users in the room
-                io.to(roomId).emit('room-updated', {
-                    roomId,
-                    participantCount: room.participants.length,
-                    participants: room.participants
-                });
+                // Populate participants before emitting
+                const updatedRoom = await Room.findById(roomId)
+                    .populate('participants', 'fullName avatarUrl');
+
+                if (updatedRoom) {
+                    // Emit updated room data to all users in the room
+                    io.to(roomId).emit('room-updated', {
+                        roomId,
+                        participantCount: updatedRoom.participants.length,
+                        participants: updatedRoom.participants
+                    });
+                }
             }
         } catch (error) {
             console.error('Error updating room participants:', error);
@@ -138,7 +144,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('chat-message', (payload) => {
-        io.to(payload.roomId).emit('chat-message', payload);
+        const message = {
+            id: payload.id,
+            userId: payload.userId,
+            text: payload.text,
+            timestamp: payload.timestamp
+        };
+        io.to(payload.roomId).emit('chat-message', message);
     });
 
     socket.on('disconnect', async () => {
