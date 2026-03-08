@@ -251,12 +251,21 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
       }
     };
 
+    const handleRoomEnded = (payload: any) => {
+      if (payload.roomId === roomId) {
+        toast.info(payload.message || 'The session has ended.');
+        localStorage.removeItem('currentRoomId');
+        onNavigate('library');
+      }
+    };
+
     socket.on('video-play', handleVideoPlay);
     socket.on('video-pause', handleVideoPause);
     socket.on('video-seek', handleVideoSeek);
     socket.on('video-sync-request', handleVideoSyncRequest);
     socket.on('video-sync-response', handleVideoSyncResponse);
     socket.on('reaction', handleReaction);
+    socket.on('room-ended', handleRoomEnded);
 
     // Request sync when joining (for non-hosts)
     if (!isHost) {
@@ -272,6 +281,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
       socket.off('video-sync-request', handleVideoSyncRequest);
       socket.off('video-sync-response', handleVideoSyncResponse);
       socket.off('reaction', handleReaction);
+      socket.off('room-ended', handleRoomEnded);
     };
   }, [roomId, isHost, getVideoController, userId]);
 
@@ -425,6 +435,30 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     const controller = getVideoController();
     if (controller) {
       controller.currentTime += seconds;
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    localStorage.removeItem('currentRoomId');
+    onNavigate('library');
+  };
+
+  const handleEndRoom = async () => {
+    if (!roomId) return;
+    const token = tokenStorage.get();
+    if (!token) return;
+
+    try {
+      const response = await roomApi.end(token, roomId);
+      if (response.success) {
+        localStorage.removeItem('currentRoomId');
+        onNavigate('library');
+      } else {
+        toast.error(response.message || 'Failed to end session');
+      }
+    } catch (error) {
+      console.error('Error ending room:', error);
+      toast.error('Failed to end session');
     }
   };
 
@@ -914,22 +948,33 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/10 flex items-center justify-center">
                 <PhoneOff className="w-8 h-8 text-red-500" />
               </div>
-              <h2 className="text-2xl font-bold text-center mb-2">Leave Session?</h2>
+              <h2 className="text-2xl font-bold text-center mb-2">{isHost ? 'End Session?' : 'Leave Session?'}</h2>
               <p className="text-white/60 text-center mb-8">
-                Are you sure you want to leave this watch party?
+                {isHost
+                  ? 'Choose whether to end this session for everyone or just leave it running.'
+                  : 'Are you sure you want to leave this watch party?'}
               </p>
               <div className="flex flex-col gap-3">
+                {isHost && (
+                  <Button
+                    onClick={handleEndRoom}
+                    className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-2xl flex items-center justify-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    End for Everyone
+                  </Button>
+                )}
                 <Button
-                  onClick={() => onNavigate('library')}
-                  className="w-full h-12 bg-red-500 hover:bg-red-600 text-white rounded-2xl"
+                  onClick={handleLeaveRoom}
+                  className={`w-full h-12 ${isHost ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500 hover:bg-red-600'} text-white rounded-2xl`}
                 >
-                  Leave Session
+                  {isHost ? 'Just Leave' : 'Leave Session'}
                 </Button>
                 <Button
                   onClick={() => setShowExitConfirm(false)}
-                  className="w-full h-12 bg-white/5 hover:bg-white/10 text-white border-white/10 rounded-2xl"
+                  className="w-full h-12 bg-transparent hover:bg-white/5 text-white/40 border border-white/10 rounded-2xl"
                 >
-                  Stay in Session
+                  Cancel
                 </Button>
               </div>
             </motion.div>
