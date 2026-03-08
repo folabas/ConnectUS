@@ -80,7 +80,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const user = userStorage.get();
   const userId = user?.userId || null;
   const roomId = activeRoom?._id || (typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null);
-  
+
   // Handle both populated host (object with _id) and direct ObjectId (string)
   // Convert both to strings for comparison to avoid type mismatch
   const hostId = activeRoom?.host?._id?.toString() || activeRoom?.host?.toString();
@@ -111,7 +111,15 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     return null;
   }, [isMuxPlayer]);
 
-  const { localStream, peers, messages, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
+  const { localStream, peers, messages, isConnected, permissionError, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
+
+  useEffect(() => {
+    if (permissionError === 'Permission denied') {
+      toast.error('Camera/Microphone access was denied. Please check your browser settings and refresh.');
+    } else if (permissionError === 'Device error') {
+      toast.error('Could not access media devices. Please ensure your camera and microphone are connected.');
+    }
+  }, [permissionError]);
 
   useEffect(() => {
     setActiveRoom(currentRoom || null);
@@ -140,31 +148,6 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     fetchRoom();
   }, [activeRoom]);
 
-  // Join socket room when entering watch screen
-  useEffect(() => {
-    if (!roomId || !userId) return;
-
-    const socket = signalingService.connect();
-
-    const joinSocketRoom = () => {
-      socket.emit('user-online', userId);
-      setTimeout(() => {
-        socket.emit('join-room', roomId, userId);
-        console.log('Emitted join-room in watch screen:', roomId, userId);
-      }, 200);
-    };
-
-    if (socket.connected) {
-      joinSocketRoom();
-    } else {
-      socket.on('connect', joinSocketRoom);
-    }
-
-    return () => {
-      socket.off('connect', joinSocketRoom);
-    };
-  }, [roomId, userId]);
-
   // Video synchronization socket listeners
   useEffect(() => {
     if (!roomId) return;
@@ -177,7 +160,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
         const now = Date.now();
         if (now - lastSyncTimeRef.current < 2000) return;
         lastSyncTimeRef.current = now;
-        
+
         isSyncingRef.current = true;
         const controller = getVideoController();
         if (controller) {
@@ -194,7 +177,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
         const now = Date.now();
         if (now - lastSyncTimeRef.current < 2000) return;
         lastSyncTimeRef.current = now;
-        
+
         isSyncingRef.current = true;
         const controller = getVideoController();
         if (controller) {
@@ -211,7 +194,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
         const now = Date.now();
         if (now - lastSyncTimeRef.current < 1000) return;
         lastSyncTimeRef.current = now;
-        
+
         isSyncingRef.current = true;
         const controller = getVideoController();
         if (controller) {
@@ -240,7 +223,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
         const now = Date.now();
         if (now - lastSyncTimeRef.current < 2000) return;
         lastSyncTimeRef.current = now;
-        
+
         isSyncingRef.current = true;
         const controller = getVideoController();
         if (controller) {
@@ -420,7 +403,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
-    
+
     if (!isSyncingRef.current) {
       const controller = getVideoController();
       if (controller) {
