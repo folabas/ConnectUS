@@ -146,8 +146,14 @@ io.on('connection', (socket) => {
         try {
             const updatedRoom = await Room.findByIdAndUpdate(
                 roomId,
-                { $pull: { participants: userId } },
-                { new: true }
+                {
+                    $pull: { participants: userId },
+                    $set: { "joinRequests.$[elem].status": "left" }
+                },
+                {
+                    arrayFilters: [{ "elem.user": userId, "elem.status": "approved" }],
+                    new: true
+                }
             ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');
 
             if (updatedRoom) {
@@ -275,8 +281,14 @@ io.on('connection', (socket) => {
             try {
                 const updatedRoom = await Room.findByIdAndUpdate(
                     roomId,
-                    { $pull: { participants: disconnectedUserId } },
-                    { new: true }
+                    {
+                        $pull: { participants: disconnectedUserId },
+                        $set: { "joinRequests.$[elem].status": "left" }
+                    },
+                    {
+                        arrayFilters: [{ "elem.user": disconnectedUserId, "elem.status": "approved" }],
+                        new: true
+                    }
                 ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');
 
                 if (updatedRoom) {

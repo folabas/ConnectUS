@@ -65,20 +65,6 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
           if (onRoomUpdate) {
             onRoomUpdate(response.data);
           }
-
-          // Check if previously approved
-          const isApproved = response.data.joinRequests?.some(
-            (r: any) => (r.user._id || r.user).toString() === userId?.toString() && r.status === 'approved'
-          );
-
-          // If was approved but not in participants (e.g. left and returned), auto-join
-          const isParticipant = response.data.participants?.some(
-            (p: any) => (p._id || p).toString() === userId?.toString()
-          );
-
-          if (isApproved && !isParticipant && response.data.status === 'playing') {
-            handleRequestJoin(); // This api call will add them back to participants
-          }
         } else {
           toast.error('Failed to load room details');
         }
@@ -95,10 +81,13 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
 
   // Handle auto-redirect if already approved and room is playing
   useEffect(() => {
-    if (room?.status === 'playing' && !redirecting) {
+    if (redirecting) return; // Already on the way
+
+    if (room?.status === 'playing') {
       const isParticipant = room.participants?.some(
         (p: any) => (p._id || p).toString() === userId?.toString()
       );
+
       if (isParticipant) {
         setRedirecting(true);
         const timer = setTimeout(() => {
