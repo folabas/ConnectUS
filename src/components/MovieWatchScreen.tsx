@@ -541,56 +541,55 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
           {/* Top Left - Room Code */}
           {activeRoom?.code && (
-            <div className="absolute top-6 left-6 flex gap-2 z-50">
-              <div className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
-                <span className="text-sm text-white/60">Room Code:</span>
-                <span className="text-sm font-mono">{activeRoom.code}</span>
+            <div className="absolute top-4 left-4 md:top-6 md:left-6 flex gap-2 z-50">
+              <div className="px-3 py-2 md:px-4 md:py-2 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
+                <span className="text-xs md:text-sm text-white/60 hidden sm:inline">Room:</span>
+                <span className="text-xs md:text-sm font-mono">{activeRoom.code}</span>
               </div>
               <button
                 onClick={handleCopyLink}
-                className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 transition-colors flex items-center gap-2"
+                className="px-2 md:px-4 py-2 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 transition-colors flex items-center gap-1 md:gap-2"
               >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span className="text-sm">{copied ? 'Copied!' : 'Copy Link'}</span>
+                {copied ? <Check className="w-3 h-3 md:w-4 md:h-4" /> : <Copy className="w-3 h-3 md:w-4 md:h-4" />}
+                <span className="text-xs md:text-sm hidden sm:inline">{copied ? 'Copied!' : 'Copy'}</span>
               </button>
             </div>
           )}
 
           {/* Admin Control Indicator */}
           {isAdminEnabled && !canControl && (
-            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 z-50">
-              <div className="px-4 py-2 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
-                <Lock className="w-4 h-4 text-yellow-500" />
-                <span className="text-sm text-white/80">Host is controlling playback</span>
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 md:top-6 z-50">
+              <div className="px-3 py-2 md:px-4 md:py-2 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-1 md:gap-2">
+                <Lock className="w-3 h-3 md:w-4 md:h-4 text-yellow-500" />
+                <span className="text-xs md:text-sm text-white/80 hidden sm:inline">Host controlling</span>
               </div>
             </div>
           )}
 
           {/* Top Right Controls and Participants */}
-          <div className="absolute top-6 right-6 flex gap-3 items-start z-50">
+          <div className="absolute top-4 right-4 md:top-6 md:right-6 flex gap-2 md:gap-3 items-start z-50">
             {/* Local Video */}
             {localStream && (
               <motion.div
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="relative group w-32 h-24 rounded-2xl overflow-hidden border border-white/20 bg-black"
+                className="relative group w-20 h-16 md:w-32 md:h-24 rounded-lg md:rounded-2xl overflow-hidden border border-white/20 bg-black"
               >
                 <VideoPlayer stream={localStream} muted={true} className="w-full h-full object-cover transform scale-x-[-1]" />
-                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-[10px]">You</div>
+                <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/60 text-[8px] md:text-[10px]">You</div>
               </motion.div>
             )}
 
             {/* Remote Videos */}
-            {peers.map((peer) => (
+            {peers.slice(0, 2).map((peer) => (
               <motion.div
                 key={peer.userId}
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className="relative group w-32 h-24 rounded-2xl overflow-hidden border border-white/20 bg-black"
+                className="relative group w-20 h-16 md:w-32 md:h-24 rounded-lg md:rounded-2xl overflow-hidden border border-white/20 bg-black"
               >
                 <VideoPlayer stream={peer.stream} className="w-full h-full object-cover" />
-                {/* Try to find participant name */}
-                <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/60 text-[10px]">
+                <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/60 text-[8px] md:text-[10px]">
                   {participants.find((p: any) => p._id === peer.userId)?.fullName || 'User'}
                 </div>
               </motion.div>
@@ -602,10 +601,10 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowChat(!showChat)}
-              className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 transition-colors"
+              className="flex items-center gap-1 md:gap-2 px-3 py-3 md:px-4 md:py-3 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 hover:bg-black/70 transition-colors"
             >
-              <MessageCircle className="w-5 h-5" />
-              <span className="text-sm">Chat</span>
+              <MessageCircle className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="text-xs md:text-sm hidden sm:inline">Chat</span>
             </motion.button>
 
             <motion.button
@@ -614,9 +613,9 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={toggleFullscreen}
-              className="w-12 h-12 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-black/70 transition-colors"
+              className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-black/70 transition-colors"
             >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+              {isFullscreen ? <Minimize className="w-4 h-4 md:w-5 md:h-5" /> : <Maximize className="w-4 h-4 md:w-5 md:h-5" />}
             </motion.button>
           </div>
 
@@ -642,7 +641,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
           </div>
 
           {/* Floating Reactions Buttons */}
-          <div className="absolute bottom-32 left-6 flex gap-3">
+          <div className="absolute bottom-28 md:bottom-32 left-4 md:left-6 flex gap-2 md:gap-3">
             {reactions.map((reaction, index) => {
               const ReactionIcon = reaction.icon;
               return (
@@ -651,7 +650,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => addReaction(reaction.icon, reaction.color, reaction.name)}
-                  className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
+                  className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/20 transition-colors"
                 >
                   <ReactionIcon className={`w-5 h-5 ${reaction.color}`} />
                 </motion.button>
@@ -666,22 +665,22 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 20, opacity: 0 }}
-                className="absolute bottom-0 left-0 right-0 px-6 pb-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
+                className="absolute bottom-0 left-0 right-0 px-3 md:px-6 pb-3 md:pb-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent"
               >
                 {/* Progress Bar */}
-                <div className="mb-4">
+                <div className="mb-3 md:mb-4">
                   <input
                     type="range"
                     min="0"
                     max={duration || 0}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1 rounded-full appearance-none cursor-pointer"
+                    className="w-full h-1 md:h-1 rounded-full appearance-none cursor-pointer"
                     style={{
                       background: `linear-gradient(to right, ${roomTheme.primary} ${(currentTime / duration) * 100}%, rgba(255,255,255,0.2) ${(currentTime / duration) * 100}%)`
                     }}
                   />
-                  <div className="flex items-center justify-between mt-2 text-sm text-white/60">
+                  <div className="flex items-center justify-between mt-1 md:mt-2 text-xs md:text-sm text-white/60">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>
@@ -689,42 +688,42 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
                 {/* Control Buttons */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 md:gap-4">
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={togglePlay}
-                      className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+                      className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
                     >
-                      {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
+                      {isPlaying ? <Pause className="w-4 h-4 md:w-5 md:h-5" /> : <Play className="w-4 h-4 md:w-5 md:h-5 ml-0.5 md:ml-1" />}
                     </motion.button>
 
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => skip(-10)}
-                      className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                      className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors hidden sm:flex"
                     >
-                      <SkipBack className="w-4 h-4" />
+                      <SkipBack className="w-3 h-3 md:w-4 md:h-4" />
                     </motion.button>
 
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => skip(10)}
-                      className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                      className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors hidden sm:flex"
                     >
-                      <SkipForward className="w-4 h-4" />
+                      <SkipForward className="w-3 h-3 md:w-4 md:h-4" />
                     </motion.button>
 
-                    <div className="flex items-center gap-2 ml-2">
+                    <div className="flex items-center gap-1 md:gap-2 ml-1 md:ml-2">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={toggleMute}
-                        className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                        className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
                       >
-                        {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                        {isMuted ? <VolumeX className="w-4 h-4 md:w-5 md:h-5" /> : <Volume2 className="w-4 h-4 md:w-5 md:h-5" />}
                       </motion.button>
                       <input
                         type="range"
@@ -733,7 +732,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
                         step="0.1"
                         value={isMuted ? 0 : volume}
                         onChange={handleVolumeChange}
-                        className="w-24 h-1 rounded-full appearance-none cursor-pointer"
+                        className="w-16 md:w-24 h-1 rounded-full appearance-none cursor-pointer"
                         style={{
                           background: `linear-gradient(to right, white ${volume * 100}%, rgba(255,255,255,0.2) ${volume * 100}%)`
                         }}
@@ -750,16 +749,16 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
         <AnimatePresence>
           {showChat && (
             <motion.div
-              initial={{ x: 400, opacity: 0 }}
+              initial={{ x: "100%", opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 400, opacity: 0 }}
-              className="w-96 bg-[#0D0D0F]/95 backdrop-blur-xl border-l border-white/10 flex flex-col z-40"
+              exit={{ x: "100%", opacity: 0 }}
+              className="fixed md:relative md:w-96 w-full h-full bg-[#0D0D0F]/95 backdrop-blur-xl border-l border-white/10 flex flex-col z-50 md:z-40 right-0 top-0"
             >
               {/* Chat Header */}
-              <div className="p-6 border-b border-white/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MessageCircle className="w-5 h-5" style={{ color: roomTheme.primary }} />
-                  <h3 className="text-lg">Live Chat</h3>
+              <div className="p-4 md:p-6 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <MessageCircle className="w-4 h-4 md:w-5 md:h-5" style={{ color: roomTheme.primary }} />
+                  <h3 className="text-base md:text-lg">Live Chat</h3>
                 </div>
                 <motion.button
                   whileHover={{ scale: 1.1 }}
@@ -772,7 +771,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-4">
                 {messages.length === 0 ? (
                   <div className="text-center text-white/40 text-sm py-4">
                     No messages yet. Start the conversation!
@@ -818,18 +817,18 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               </div>
 
               {/* Chat Input */}
-              <div className="p-6 border-t border-white/10">
+              <div className="p-4 md:p-6 border-t border-white/10">
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Type a message..."
+                    placeholder="Type..."
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    className="flex-1 h-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF]"
+                    className="flex-1 h-10 md:h-12 bg-white/5 border-white/10 rounded-xl md:rounded-2xl text-white text-sm placeholder:text-white/40 focus:border-[#695CFF]"
                   />
                   <Button
                     onClick={handleSendMessage}
-                    className="h-12 px-6 rounded-2xl text-white"
+                    className="h-10 md:h-12 px-4 md:px-6 rounded-xl md:rounded-2xl text-white text-sm"
                     style={{
                       background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
                     }}
@@ -844,11 +843,11 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
       </div>
 
       {/* Bottom Control Bar - Always Fixed and Visible */}
-      <div className="flex-none px-6 py-4 bg-[#0D0D0F] border-t border-white/10 flex items-center justify-between z-50 relative">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+      <div className="flex-none px-3 py-3 md:px-6 md:py-4 bg-[#0D0D0F] border-t border-white/10 flex items-center justify-between z-50 relative">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1 md:gap-2">
             <Users className="w-4 h-4 text-white/60" />
-            <span className="text-sm text-white/60">{participants.length} watching</span>
+            <span className="text-xs md:text-sm text-white/60">{participants.length} watching</span>
           </div>
         </div>
 

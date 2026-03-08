@@ -19,6 +19,12 @@
     "license": "ISC",
     "dependencies": {
         "@mux/mux-node": "^12.8.0",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.5",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/node": "^24.10.1",
+        "@types/node-cron": "^3.0.11",
         "@types/nodemailer": "^7.0.4",
         "bcryptjs": "^3.0.3",
         "cors": "^2.8.5",
@@ -31,17 +37,11 @@
         "nodemailer": "^7.0.10",
         "resend": "^6.5.2",
         "socket.io": "^4.8.1",
+        "typescript": "^5.9.3",
         "zod": "^4.1.12"
     },
     "devDependencies": {
-        "@types/bcryptjs": "^2.4.6",
-        "@types/cors": "^2.8.19",
-        "@types/express": "^5.0.5",
-        "@types/jsonwebtoken": "^9.0.10",
-        "@types/node": "^24.10.1",
-        "@types/node-cron": "^3.0.11",
         "nodemon": "^3.1.11",
-        "ts-node": "^10.9.2",
-        "typescript": "^5.9.3"
+        "ts-node": "^10.9.2"
     }
 }

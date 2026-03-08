@@ -2,7 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
 import { User } from '../models/User';
 
-export interface AuthRequest extends Request {
+export interface AuthRequest<
+    Params = any,
+    ResBody = any,
+    ReqBody = any,
+    ReqQuery = any
+> extends Request<Params, ResBody, ReqBody, ReqQuery> {
     user?: {
         userId: string;
         email: string;
