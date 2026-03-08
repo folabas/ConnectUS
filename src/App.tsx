@@ -59,7 +59,7 @@ export default function App() {
 
   // Listen for real-time friend notifications
   useEffect(() => {
-    const userData = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
+    const userData = typeof window !== 'undefined' ? localStorage.getItem('connectus_user') : null;
     if (!userData) return;
 
     const socket = signalingService.connect();

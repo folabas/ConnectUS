@@ -65,7 +65,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   useEffect(() => {
     const socket = signalingService.connect(); // Ensure connection
     const currentRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
-    const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
+    const userDataStr = typeof window !== 'undefined' ? localStorage.getItem('connectus_user') : null;
 
     if (!socket || !currentRoomId || !userDataStr) return;
 
@@ -187,8 +187,8 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const isPrivate = room?.type === 'private';
   const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/join/${roomCode}` : `connectus.live/join/${roomCode}`;
 
-  // Safe user access
-  const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('userData') || '{}') : {};
+  // Safe user access - use correct localStorage key
+  const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('connectus_user') || '{}') : {};
   
   // Handle both populated host (object with _id) and direct ObjectId (string)
   // Convert both to strings for comparison to avoid type mismatch
@@ -196,7 +196,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const isHost = hostId === currentUser.userId?.toString();
 
   // Debug log (remove in production)
-  console.log('Host check:', { hostId, currentUserId: currentUser.userId, isHost, roomHost: room?.host });
+  console.log('Host check:', { hostId, currentUser, isHost, roomHost: room?.host });
 
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white">
