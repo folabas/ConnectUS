@@ -500,6 +500,9 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   };
 
   const handleLeaveRoom = () => {
+    if (roomId && userId) {
+      signalingService.socket?.emit('leave-room', roomId, userId);
+    }
     localStorage.removeItem('currentRoomId');
     onNavigate('library');
   };

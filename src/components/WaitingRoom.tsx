@@ -257,6 +257,10 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   };
 
   const handleLeaveRoom = () => {
+    const roomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
+    if (roomId && userId) {
+      signalingService.socket?.emit('leave-room', roomId, userId);
+    }
     localStorage.removeItem('currentRoomId');
     onNavigate('library');
   };

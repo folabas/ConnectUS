@@ -139,6 +139,32 @@ io.on('connection', (socket) => {
         socket.data.currentUserId = userId;
     });
 
+    socket.on('leave-room', async (roomId, userId) => {
+        socket.leave(roomId);
+        console.log(`User ${userId} left room ${roomId}`);
+
+        try {
+            const updatedRoom = await Room.findByIdAndUpdate(
+                roomId,
+                { $pull: { participants: userId } },
+                { new: true }
+            ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');
+
+            if (updatedRoom) {
+                io.to(roomId).emit('room-updated', {
+                    roomId,
+                    participantCount: updatedRoom.participants.length,
+                    participants: updatedRoom.participants,
+                    host: updatedRoom.host,
+                    movie: updatedRoom.movie,
+                    status: updatedRoom.status
+                });
+            }
+        } catch (error) {
+            console.error('Error updating room on leave:', error);
+        }
+    });
+
     // Forward signaling payloads with senderSocketId
     socket.on('offer', (payload) => {
         // Payload should include: targetSocketId, sdp, sender (userId)
