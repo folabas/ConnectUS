@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2, UserPlus, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
@@ -21,6 +21,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [joinRequestPending, setJoinRequestPending] = useState(false);
@@ -46,7 +47,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
         const response = await roomApi.getById(token, roomId);
         if (response.success && response.data) {
           setRoom(response.data);
-          
+
           // Check if current user has a pending request
           const userData = JSON.parse(localStorage.getItem('connectus_user') || '{}');
           const userId = userData.userId;
@@ -56,7 +57,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
           if (pendingRequest) {
             setJoinRequestPending(true);
           }
-          
+
           if (onRoomUpdate) {
             onRoomUpdate(response.data);
           }
@@ -224,7 +225,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     if (!room?._id || !processingRequest) {
       setProcessingRequest(userId);
     }
-    
+
     try {
       const token = tokenStorage.get();
       if (!token || !room?._id) return;
@@ -308,7 +309,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
 
   // Safe user access - use correct localStorage key
   const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('connectus_user') || '{}') : {};
-  
+
   // Handle both populated host (object with _id) and direct ObjectId (string)
   // Convert both to strings for comparison to avoid type mismatch
   const hostId = room?.host?._id?.toString() || room?.host?.toString();
@@ -323,7 +324,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       <nav className="px-8 py-6 border-b border-white/5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <button
-            onClick={() => onNavigate('library')}
+            onClick={() => setShowExitConfirm(true)}
             className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -568,6 +569,48 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
         roomId={room?._id}
         roomCode={room?.code}
       />
+      {/* Exit Confirmation Modal */}
+      <AnimatePresence>
+        {showExitConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowExitConfirm(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-[#1A1A1E] border border-white/10 rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                <XCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-center mb-2">Leave Room?</h2>
+              <p className="text-white/60 text-center mb-8">
+                Are you sure you want to leave this watch party?
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => onNavigate('library')}
+                  className="w-full h-12 bg-red-500 hover:bg-red-600 text-white rounded-2xl"
+                >
+                  Leave Session
+                </Button>
+                <Button
+                  onClick={() => setShowExitConfirm(false)}
+                  className="w-full h-12 bg-white/5 hover:bg-white/10 text-white border-white/10 rounded-2xl"
+                >
+                  Stay in Session
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

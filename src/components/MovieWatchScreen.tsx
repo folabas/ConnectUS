@@ -67,6 +67,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const [chatInput, setChatInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [muxPlayerReady, setMuxPlayerReady] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const muxPlayerRef = useRef<HTMLElement & { play?: () => Promise<void>; pause?: () => void; currentTime?: number; paused?: boolean; duration?: number; volume?: number; muted?: boolean }>(null);
@@ -885,13 +886,56 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onNavigate('library')}
+            onClick={() => setShowExitConfirm(true)}
             className="w-10 h-10 rounded-full bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
           >
             <PhoneOff className="w-4 h-4 text-red-500" />
           </motion.button>
         </div>
       </div>
+
+      {/* Exit Confirmation Modal */}
+      <AnimatePresence>
+        {showExitConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowExitConfirm(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-sm bg-[#1A1A1E] border border-white/10 rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                <PhoneOff className="w-8 h-8 text-red-500" />
+              </div>
+              <h2 className="text-2xl font-bold text-center mb-2">Leave Session?</h2>
+              <p className="text-white/60 text-center mb-8">
+                Are you sure you want to leave this watch party?
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => onNavigate('library')}
+                  className="w-full h-12 bg-red-500 hover:bg-red-600 text-white rounded-2xl"
+                >
+                  Leave Session
+                </Button>
+                <Button
+                  onClick={() => setShowExitConfirm(false)}
+                  className="w-full h-12 bg-white/5 hover:bg-white/10 text-white border-white/10 rounded-2xl"
+                >
+                  Stay in Session
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div >
   );
 }

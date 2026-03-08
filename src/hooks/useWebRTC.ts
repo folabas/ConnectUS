@@ -161,23 +161,15 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
 
                 const socket = signalingService.connect();
 
-                // Wait for socket to be ready before emitting
-                const setupSocket = () => {
-                    console.log('Socket ready in useWebRTC, emitting join-room');
-                    socket.emit('user-online', userId);
-                    socket.emit('join-room', roomId, userId);
-                };
-
-                if (socket.connected) {
-                    setupSocket();
-                } else {
-                    socket.once('connect', setupSocket);
-                }
+                // Use signalingService.joinRoom to benefit from its auto-rejoin logic
+                console.log('Joining room via signalingService:', roomId);
+                await signalingService.joinRoom(roomId, userId);
 
                 socket.on('existing-participants', (users: { userId: string; socketId: string }[]) => {
                     console.log('Existing participants:', users);
                     users.forEach((user) => {
                         if (user.userId !== userId && !peersRef.current[user.socketId]) {
+                            // Newcomer initiates to all existing members
                             createPeerConnection(user.socketId, user.userId, true);
                         }
                     });
@@ -187,28 +179,31 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                 socket.on('user-connected', async (data: { userId: string; socketId: string }) => {
                     console.log('User connected:', data.userId, 'Socket:', data.socketId);
                     if (data.userId !== userId && !peersRef.current[data.socketId]) {
-                        createPeerConnection(data.socketId, data.userId, true);
+                        // Existing members wait for the newcomer to initiate
+                        createPeerConnection(data.socketId, data.userId, false);
                     }
                 });
 
                 socket.on('offer', async (payload: any) => {
-                    console.log('Received offer from:', payload.sender);
+                    console.log('Received offer from:', payload.sender, 'Socket:', payload.senderSocketId);
                     const pc = createPeerConnection(payload.senderSocketId, payload.sender, false);
-                    await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    signalingService.sendAnswer({
-                        roomId,
-                        targetSocketId: payload.senderSocketId,
-                        sdp: answer,
-                        sender: userId
-                    });
+                    if (pc) {
+                        await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        signalingService.sendAnswer({
+                            roomId,
+                            targetSocketId: payload.senderSocketId,
+                            sdp: answer,
+                            sender: userId
+                        });
+                    }
                 });
 
                 socket.on('answer', async (payload: any) => {
                     console.log('Received answer from:', payload.sender);
                     const pc = peersRef.current[payload.senderSocketId];
-                    if (pc) {
+                    if (pc && pc.signalingState !== 'stable') {
                         await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
                     }
                 });
@@ -217,7 +212,13 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                     const pc = peersRef.current[payload.senderSocketId];
                     if (pc && payload.candidate) {
                         try {
-                            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                            // Only add candidate if remote description is set
+                            if (pc.remoteDescription) {
+                                await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                            } else {
+                                // Potentially queue candidates? For now just log
+                                console.log('Queuing/ignoring candidate as remote description is not set');
+                            }
                         } catch (e) {
                             console.error('Error adding ice candidate:', e);
                         }
@@ -236,7 +237,6 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
 
                 socket.on('chat-message', (message: ChatMessage) => {
                     setMessages(prev => {
-                        // Prevent duplicates
                         if (prev.find(m => m.id === message.id)) return prev;
                         return [...prev, message];
                     });
@@ -264,6 +264,20 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
         return () => {
             isMounted = false;
             initializationStatus.current = 'idle';
+
+            const socket = signalingService.socket;
+            if (socket) {
+                socket.off('existing-participants');
+                socket.off('user-connected');
+                socket.off('offer');
+                socket.off('answer');
+                socket.off('ice-candidate');
+                socket.off('user-disconnected');
+                socket.off('chat-message');
+                socket.off('disconnect');
+                socket.off('reconnect');
+            }
+
             localStreamRef.current?.getTracks().forEach(track => track.stop());
             Object.values(peersRef.current).forEach(pc => pc.close());
             peersRef.current = {};

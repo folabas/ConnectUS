@@ -186,40 +186,40 @@ io.on('connection', (socket) => {
     socket.on('video-play', async (payload) => {
         const userId = socketToUser.get(socket.id);
         if (!userId) return;
-        
+
         // Check if user is host
         const room = await Room.findById(payload.roomId);
         if (!room || room.host.toString() !== userId) {
             socket.emit('error', { message: 'Only host can control playback' });
             return;
         }
-        
+
         socket.to(payload.roomId).emit('video-play', payload);
     });
 
     socket.on('video-pause', async (payload) => {
         const userId = socketToUser.get(socket.id);
         if (!userId) return;
-        
+
         const room = await Room.findById(payload.roomId);
         if (!room || room.host.toString() !== userId) {
             socket.emit('error', { message: 'Only host can control playback' });
             return;
         }
-        
+
         socket.to(payload.roomId).emit('video-pause', payload);
     });
 
     socket.on('video-seek', async (payload) => {
         const userId = socketToUser.get(socket.id);
         if (!userId) return;
-        
+
         const room = await Room.findById(payload.roomId);
         if (!room || room.host.toString() !== userId) {
             socket.emit('error', { message: 'Only host can control playback' });
             return;
         }
-        
+
         socket.to(payload.roomId).emit('video-seek', payload);
     });
 
@@ -244,7 +244,7 @@ io.on('connection', (socket) => {
         // If user was in a room, emit user-disconnected and update room
         if (roomId && disconnectedUserId) {
             socket.to(roomId).emit('user-disconnected', { userId: disconnectedUserId, socketId: socket.id });
-            
+
             // Remove user from room participants in DB and emit update
             try {
                 const updatedRoom = await Room.findByIdAndUpdate(

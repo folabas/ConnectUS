@@ -174,10 +174,12 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             return;
         }
 
-        // For private rooms joined via roomId (not code), check if user is already a participant
+        // For private rooms joined via roomId (not code), check if user is already a participant or was previously approved
         if (room.type === 'private' && !code) {
             const isParticipant = room.participants.some((p) => p.toString() === userId);
-            if (!isParticipant) {
+            const isApproved = room.joinRequests?.some((r) => r.user.toString() === userId && r.status === 'approved');
+
+            if (!isParticipant && !isApproved && room.host.toString() !== userId) {
                 res.status(403).json({
                     success: false,
                     message: 'This is a private room. Please use an invite link or room code.',
