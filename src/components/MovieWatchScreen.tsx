@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import type { ComponentType, SVGProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock, Loader2, XCircle } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock, Loader2, XCircle, UserPlus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Movie, RoomTheme, Screen, Room } from '../App';
@@ -68,6 +68,8 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const [copied, setCopied] = useState(false);
   const [muxPlayerReady, setMuxPlayerReady] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showRequestsModal, setShowRequestsModal] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const muxPlayerRef = useRef<HTMLElement & { play?: () => Promise<void>; pause?: () => void; currentTime?: number; paused?: boolean; duration?: number; volume?: number; muted?: boolean }>(null);
@@ -161,6 +163,23 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
     fetchRoom();
   }, [activeRoom]);
+
+  const fetchRoomData = async () => {
+    const storedRoomId = roomId || (typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null);
+    if (!storedRoomId) return;
+
+    const token = tokenStorage.get();
+    if (!token) return;
+
+    try {
+      const response = await roomApi.getById(token, storedRoomId);
+      if (response.success && response.data) {
+        setActiveRoom(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching room:', error);
+    }
+  };
 
   // Video synchronization socket listeners
   useEffect(() => {
@@ -272,6 +291,33 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
       }
     };
 
+    const handleJoinRequestReceived = (payload: any) => {
+      if (payload.roomId === roomId && isHost) {
+        toast.info(`New join request from a user`, {
+          action: {
+            label: 'View',
+            onClick: () => setShowRequestsModal(true)
+          }
+        });
+        // Refresh room data to show new requests
+        fetchRoomData();
+      }
+    };
+
+    const handleRoomUpdated = (payload: any) => {
+      if (payload.roomId === roomId) {
+        // Update local room state if participants or requests changed
+        setActiveRoom(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            participants: payload.participants || prev.participants,
+            joinRequests: payload.joinRequests || prev.joinRequests
+          };
+        });
+      }
+    };
+
     socket.on('video-play', handleVideoPlay);
     socket.on('video-pause', handleVideoPause);
     socket.on('video-seek', handleVideoSeek);
@@ -279,6 +325,8 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     socket.on('video-sync-response', handleVideoSyncResponse);
     socket.on('reaction', handleReaction);
     socket.on('room-ended', handleRoomEnded);
+    socket.on('join-request-received', handleJoinRequestReceived);
+    socket.on('room-updated', handleRoomUpdated);
 
     // Request sync when joining (for non-hosts)
     if (!isHost) {
@@ -546,6 +594,54 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     }
   };
 
+  const handleApproveRequest = async (requestedUserId: string) => {
+    setProcessingRequest(requestedUserId);
+    try {
+      const token = tokenStorage.get();
+      if (!token || !roomId) return;
+
+      const response = await roomApi.approveJoinRequest(token, roomId, requestedUserId);
+      if (response.success) {
+        toast.success('User approved to join');
+        setActiveRoom(response.data);
+      } else {
+        toast.error(response.message || 'Failed to approve request');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast.error('Failed to approve request');
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
+  const handleRejectRequest = async (requestedUserId: string) => {
+    setProcessingRequest(requestedUserId);
+    try {
+      const token = tokenStorage.get();
+      if (!token || !roomId) return;
+
+      const response = await roomApi.rejectJoinRequest(token, roomId, requestedUserId);
+      if (response.success) {
+        toast.info('Join request rejected');
+        setActiveRoom(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            joinRequests: prev.joinRequests?.filter((r: any) => r.user._id !== requestedUserId)
+          };
+        });
+      } else {
+        toast.error(response.message || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Failed to reject request');
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
   if (!movie) {
     return (
       <div className="h-screen bg-[#0D0D0F] text-white flex items-center justify-center">
@@ -677,6 +773,24 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
             >
               {isFullscreen ? <Minimize className="w-4 h-4 md:w-5 md:h-5" /> : <Maximize className="w-4 h-4 md:w-5 md:h-5" />}
             </motion.button>
+
+            {isHost && (
+              <motion.button
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowRequestsModal(true)}
+                className="relative w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-black/70 transition-colors"
+              >
+                <UserPlus className="w-4 h-4 md:w-5 md:h-5" />
+                {activeRoom?.joinRequests?.some((r: any) => r.status === 'pending') && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 md:w-4 md:h-4 bg-red-500 rounded-full border-2 border-[#0D0D0F] flex items-center justify-center text-[8px] md:text-[10px] font-bold">
+                    {activeRoom.joinRequests.filter((r: any) => r.status === 'pending').length}
+                  </span>
+                )}
+              </motion.button>
+            )}
           </div>
 
           {/* Floating Reactions Container */}
@@ -988,6 +1102,91 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
                   className="w-full h-12 bg-transparent hover:bg-white/5 text-white/40 border border-white/10 rounded-2xl"
                 >
                   Cancel
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showRequestsModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowRequestsModal(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-[#1A1A1E] border border-white/10 rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold">Join Requests</h2>
+                  <p className="text-xs text-white/40">Manage who can join your session</p>
+                </div>
+                <button
+                  onClick={() => setShowRequestsModal(false)}
+                  className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5 text-white/60" />
+                </button>
+              </div>
+
+              <div className="p-6 max-h-[400px] overflow-y-auto">
+                {activeRoom?.joinRequests?.filter((r: any) => r.status === 'pending').length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/5 flex items-center justify-center">
+                      <Users className="w-8 h-8 text-white/20" />
+                    </div>
+                    <p className="text-white/40">No pending join requests</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {activeRoom?.joinRequests
+                      ?.filter((r: any) => r.status === 'pending')
+                      .map((request: any) => (
+                        <div key={request.user._id} className="p-4 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center font-bold">
+                              {request.user.fullName?.[0] || 'U'}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{request.user.fullName}</p>
+                              <p className="text-[10px] text-white/40">Requested access</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              disabled={processingRequest === request.user._id}
+                              onClick={() => handleRejectRequest(request.user._id)}
+                              className="w-9 h-9 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-500 flex items-center justify-center transition-colors"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                            <button
+                              disabled={processingRequest === request.user._id}
+                              onClick={() => handleApproveRequest(request.user._id)}
+                              className="w-9 h-9 rounded-xl bg-green-500/10 hover:bg-green-500/20 text-green-500 flex items-center justify-center transition-colors"
+                            >
+                              <Check className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-white/5 border-t border-white/10">
+                <Button
+                  onClick={() => setShowRequestsModal(false)}
+                  className="w-full h-12 bg-white/10 hover:bg-white/20 text-white rounded-2xl"
+                >
+                  Close
                 </Button>
               </div>
             </motion.div>

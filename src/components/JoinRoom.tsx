@@ -142,32 +142,12 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
           return pId === currentUser.userId;
         });
 
-        if (isParticipant) {
-          toast.success('Joined room successfully!');
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('currentRoomId', room._id);
-          }
-          onNavigate('waiting-room');
-        } else {
-          // User needs approval - store roomId and show pending state
-          toast.info('Join request sent! Waiting for host approval.');
-          setPendingRoomId(room._id);
-          setJoinRequestStatus('pending');
+        // Store room ID and navigate
+        const roomIdToStore = room?._id || (response as any).data?._id || roomId || roomCode;
+        if (typeof window !== 'undefined' && roomIdToStore) {
+          localStorage.setItem('currentRoomId', roomIdToStore);
         }
-      } else if ((response as any).requiresApproval) {
-        // Explicitly handle "requires approval" response
-        const room = (response as any).data;
-        const roomId = room?._id || roomCode; // Use roomCode if roomId not available
-
-        // Call requestToJoin to ensure they are in the pending list
-        const requestResponse = await roomApi.requestToJoin(token, room?._id || roomId);
-        if (requestResponse.success) {
-          toast.info('Join request sent! Waiting for host approval.');
-          setPendingRoomId(room?._id || roomId);
-          setJoinRequestStatus('pending');
-        } else {
-          toast.error(requestResponse.message || 'Failed to send join request');
-        }
+        onNavigate('waiting-room');
       } else if (response.message?.includes('private') || response.message?.includes('invite')) {
         // If room is private and requires invite, offer to send request
         if (roomId) {

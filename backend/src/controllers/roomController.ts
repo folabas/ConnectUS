@@ -181,16 +181,18 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             return;
         }
 
-        // Check if approval is required
-        if (room.approvalRequired && !code && room.host.toString() !== userId) {
+        // Check if approval is required (Only if room is already playing)
+        if (room.status === 'playing' && room.approvalRequired && room.host.toString() !== userId) {
             const isParticipant = room.participants.some((p) => p.toString() === userId);
             const isApproved = room.joinRequests?.some((r) => r.user.toString() === userId && r.status === 'approved');
 
             if (!isParticipant && !isApproved) {
+                // Return room data but with status indicating they are not a participant yet
+                // They can enter the waiting room as a visitor to "Ask to Join"
                 res.status(200).json({
-                    success: false,
+                    success: true,
                     requiresApproval: true,
-                    message: 'Host approval is required to join this room.',
+                    message: 'Host approval is required to join this session in progress.',
                     data: room
                 });
                 return;

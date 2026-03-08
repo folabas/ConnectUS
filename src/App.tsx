@@ -19,7 +19,6 @@ export interface RoomTheme {
   name: string;
 }
 
-
 export interface Movie {
   id: string;
   title: string;
@@ -42,8 +41,14 @@ export interface Room {
   startTime?: string;
   maxParticipants: number;
   adminEnabled: boolean;
+  approvalRequired: boolean;
   participants: any[];
-  status: 'waiting' | 'playing' | 'finished';
+  status: 'waiting' | 'playing' | 'finished' | 'scheduled';
+  joinRequests?: Array<{
+    user: any;
+    requestedAt: string;
+    status: 'pending' | 'approved' | 'rejected';
+  }>;
 }
 
 export default function App() {
@@ -64,7 +69,7 @@ export default function App() {
 
     const socket = signalingService.connect();
     const user = JSON.parse(userData);
-    
+
     // Emit user online status
     if (socket.connected) {
       socket.emit('user-online', user.userId);
@@ -83,7 +88,7 @@ export default function App() {
     };
 
     const handleRoomInvite = (data: { roomId: string; roomName: string; fromUserName: string }) => {
-      toast.info(`${data.fromUserName} invited you to "${data.roomName}"`, { 
+      toast.info(`${data.fromUserName} invited you to "${data.roomName}"`, {
         duration: 5000,
         action: {
           label: 'Join',

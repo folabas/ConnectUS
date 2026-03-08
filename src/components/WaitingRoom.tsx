@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2, UserPlus, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2, UserPlus, CheckCircle, XCircle, Clock, Send } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -26,6 +26,9 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const [loading, setLoading] = useState(true);
   const [joinRequestPending, setJoinRequestPending] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+
+  const userData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('connectus_user') || '{}') : {};
+  const userId = userData.userId;
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -319,6 +322,24 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     }
   };
 
+  const handleRequestJoin = async () => {
+    try {
+      const token = tokenStorage.get();
+      if (!token || !room?._id) return;
+
+      const response = await roomApi.requestToJoin(token, room._id);
+      if (response.success) {
+        toast.success('Join request sent! Waiting for host approval.');
+        setJoinRequestPending(true);
+      } else {
+        toast.error(response.message || 'Failed to send join request');
+      }
+    } catch (error) {
+      console.error('Error requesting join:', error);
+      toast.error('Failed to send join request');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center">
@@ -581,11 +602,24 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                   >
                     Start Session
                   </Button>
-                ) : joinRequestPending ? (
-                  <div className="text-center p-4 rounded-2xl bg-yellow-500/10 text-yellow-500 flex flex-col items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Waiting for host approval...
-                  </div>
+                ) : !room.participants?.some((p: any) => (p._id || p).toString() === userId?.toString()) && room.status === 'playing' ? (
+                  joinRequestPending ? (
+                    <div className="text-center p-4 rounded-2xl bg-yellow-500/10 text-yellow-500 flex flex-col items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Waiting for host approval...
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={handleRequestJoin}
+                      className="w-full h-14 text-lg font-medium rounded-2xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
+                      }}
+                    >
+                      <Send className="w-5 h-5 mr-2" />
+                      Ask to Join
+                    </Button>
+                  )
                 ) : (
                   <div className="text-center p-4 rounded-2xl bg-white/5 text-white/60">
                     Waiting for host to start...
