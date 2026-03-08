@@ -266,7 +266,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4 tracking-tight">Join a Session</h1>
           <p className="text-white/60 text-lg">
-            Browse public watch parties or enter a code to join a private room
+            Browse active sessions or enter a code to join a private room
           </p>
         </div>
 
@@ -280,10 +280,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
                 : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
             >
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4" />
-                Public Rooms
-              </div>
+              Discover Sessions
             </button>
             <button
               onClick={() => setActiveTab('private')}
@@ -292,10 +289,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
                 : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
             >
-              <div className="flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                Private Code
-              </div>
+              Join with Code
             </button>
           </div>
         </div>
@@ -428,12 +422,12 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
                         ) : room.type === 'private' || room.approvalRequired ? (
                           <>
                             <Send className="w-4 h-4 mr-2" />
-                            Ask to Join
+                            Request Access
                           </>
                         ) : (
                           <>
                             <Play className="w-4 h-4 mr-2 fill-current" />
-                            Join Session
+                            Join Now
                           </>
                         )}
                       </Button>

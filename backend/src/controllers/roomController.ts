@@ -96,7 +96,13 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
             success: true,
             count: rooms.length,
-            data: rooms,
+            data: rooms.map(room => {
+                const r = room.toObject();
+                return {
+                    ...r,
+                    approvalRequired: r.approvalRequired ?? (r.type === 'private')
+                };
+            }),
         });
     } catch (error: any) {
         console.error('Get rooms error:', error);
