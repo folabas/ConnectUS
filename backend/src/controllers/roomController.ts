@@ -301,6 +301,9 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
     try {
         const { id } = req.params;
         const userId = req.user?.userId;
+        
+        console.log('[START ROOM DEBUG] Request userId:', userId);
+        console.log('[START ROOM DEBUG] Room ID:', id);
 
         const room = await Room.findById(id).populate('movie').populate('host', 'fullName avatarUrl');
         if (!room) {

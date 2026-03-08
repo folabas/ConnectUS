@@ -33,6 +33,9 @@ export const authMiddleware = async (
         const token = authHeader.substring(7);
 
         const decoded = verifyToken(token);
+        
+        console.log('[AUTH DEBUG] Token decoded:', decoded);
+        console.log('[AUTH DEBUG] User ID from token:', decoded?.userId);
 
         // Check if user still exists
         const user = await User.findById(decoded.userId);
