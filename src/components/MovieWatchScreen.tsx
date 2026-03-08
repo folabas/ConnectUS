@@ -140,6 +140,31 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     fetchRoom();
   }, [activeRoom]);
 
+  // Join socket room when entering watch screen
+  useEffect(() => {
+    if (!roomId || !userId) return;
+
+    const socket = signalingService.connect();
+
+    const joinSocketRoom = () => {
+      socket.emit('user-online', userId);
+      setTimeout(() => {
+        socket.emit('join-room', roomId, userId);
+        console.log('Emitted join-room in watch screen:', roomId, userId);
+      }, 200);
+    };
+
+    if (socket.connected) {
+      joinSocketRoom();
+    } else {
+      socket.on('connect', joinSocketRoom);
+    }
+
+    return () => {
+      socket.off('connect', joinSocketRoom);
+    };
+  }, [roomId, userId]);
+
   // Video synchronization socket listeners
   useEffect(() => {
     if (!roomId) return;
