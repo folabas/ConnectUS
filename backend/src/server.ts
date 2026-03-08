@@ -54,7 +54,9 @@ app.use(cors({
     ]
 }));
 
-// ... (rest of middleware)
+// JSON Body Parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Socket.io Signaling Logic
 const userSockets = new Map<string, string>(); // userId -> socketId
