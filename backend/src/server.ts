@@ -1,6 +1,7 @@
 // Load environment variables FIRST before any other imports
 import dotenv from 'dotenv';
 dotenv.config();
+import mongoose from 'mongoose';
 
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
@@ -144,14 +145,19 @@ io.on('connection', (socket) => {
         console.log(`User ${userId} left room ${roomId}`);
 
         try {
+            // First notify others with name
+            const user = await User.findById(userId);
+            const userName = user?.fullName || 'A participant';
+            io.to(roomId).emit('user-left', { userId, userName });
+
             const updatedRoom = await Room.findByIdAndUpdate(
                 roomId,
                 {
-                    $pull: { participants: userId },
+                    $pull: { participants: new mongoose.Types.ObjectId(userId) as any },
                     $set: { "joinRequests.$[elem].status": "left" }
                 },
                 {
-                    arrayFilters: [{ "elem.user": userId, "elem.status": "approved" }],
+                    arrayFilters: [{ "elem.user": new mongoose.Types.ObjectId(userId), "elem.status": "approved" }],
                     new: true
                 }
             ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');
@@ -279,14 +285,19 @@ io.on('connection', (socket) => {
 
             // Remove user from room participants in DB and emit update
             try {
+                // First notify others with name
+                const user = await User.findById(disconnectedUserId);
+                const userName = user?.fullName || 'A participant';
+                io.to(roomId).emit('user-left', { userId: disconnectedUserId, userName });
+
                 const updatedRoom = await Room.findByIdAndUpdate(
                     roomId,
                     {
-                        $pull: { participants: disconnectedUserId },
+                        $pull: { participants: new mongoose.Types.ObjectId(disconnectedUserId) as any },
                         $set: { "joinRequests.$[elem].status": "left" }
                     },
                     {
-                        arrayFilters: [{ "elem.user": disconnectedUserId, "elem.status": "approved" }],
+                        arrayFilters: [{ "elem.user": new mongoose.Types.ObjectId(disconnectedUserId), "elem.status": "approved" }],
                         new: true
                     }
                 ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');

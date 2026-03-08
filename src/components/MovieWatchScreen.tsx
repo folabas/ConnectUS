@@ -143,9 +143,9 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
   useEffect(() => {
     const fetchRoom = async () => {
-      if (activeRoom) return;
+      if (activeRoom) return; // Only fetch if not already loaded
 
-      const storedRoomId = typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null;
+      const storedRoomId = roomId || (typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null);
       if (!storedRoomId) return;
 
       const token = tokenStorage.get();
@@ -162,7 +162,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     };
 
     fetchRoom();
-  }, [activeRoom]);
+  }, [roomId, activeRoom]);
 
   const fetchRoomData = async () => {
     const storedRoomId = roomId || (typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null);
@@ -325,6 +325,22 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     socket.on('video-sync-response', handleVideoSyncResponse);
     socket.on('reaction', handleReaction);
     socket.on('room-ended', handleRoomEnded);
+    socket.on('user-left', (data: { userId: string, userName: string }) => {
+      if (data.userId !== userId) {
+        toast.info(`${data.userName} left the room`);
+        fetchRoomData();
+      }
+    });
+    socket.on('user-connected', ({ userId: connectingUserId }) => {
+      if (connectingUserId !== userId) {
+        fetchRoomData();
+      }
+    });
+    socket.on('user-disconnected', ({ userId: disconnectedUserId }) => {
+      if (disconnectedUserId !== userId) {
+        fetchRoomData();
+      }
+    });
     socket.on('join-request-received', handleJoinRequestReceived);
     socket.on('room-updated', handleRoomUpdated);
 
@@ -336,13 +352,13 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     }
 
     return () => {
-      socket.off('video-play', handleVideoPlay);
-      socket.off('video-pause', handleVideoPause);
-      socket.off('video-seek', handleVideoSeek);
-      socket.off('video-sync-request', handleVideoSyncRequest);
-      socket.off('video-sync-response', handleVideoSyncResponse);
       socket.off('reaction', handleReaction);
       socket.off('room-ended', handleRoomEnded);
+      socket.off('room-updated', handleRoomUpdated);
+      socket.off('user-left');
+      socket.off('user-connected');
+      socket.off('user-disconnected');
+      socket.off('join-request-received', handleJoinRequestReceived);
     };
   }, [roomId, isHost, getVideoController, userId]);
 
@@ -704,6 +720,10 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               <div className="px-3 py-2 md:px-4 md:py-2 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
                 <span className="text-xs md:text-sm text-white/60 hidden sm:inline">Room:</span>
                 <span className="text-xs md:text-sm font-mono">{activeRoom.code}</span>
+              </div>
+              <div className="px-3 py-2 md:px-4 md:py-2 rounded-xl md:rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 flex items-center gap-2">
+                <Users className="w-3 h-3 md:w-4 md:h-4 text-[#695CFF]" />
+                <span className="text-xs md:text-sm font-medium">{participants.length}</span>
               </div>
               <button
                 onClick={handleCopyLink}

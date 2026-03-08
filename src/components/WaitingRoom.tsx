@@ -196,6 +196,13 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       }
     };
 
+    const handleUserLeft = (data: { userId: string, userName: string }) => {
+      // Don't show toast for yourself unless needed
+      if (data.userId !== userId) {
+        toast.info(`${data.userName} left the room`);
+      }
+    };
+
     // Register listeners FIRST
     socket.on('room-updated', handleRoomUpdate);
     socket.on('room-starting-soon', handleRoomStartingSoon);
@@ -204,6 +211,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     socket.on('join-request-approved', handleJoinRequestApproved);
     socket.on('join-request-rejected', handleJoinRequestRejected);
     socket.on('room-ended', handleRoomEnded);
+    socket.on('user-left', handleUserLeft);
 
     // THEN emit join-room (after listeners are set up)
     const joinRoom = () => {
@@ -228,6 +236,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       socket.off('join-request-approved', handleJoinRequestApproved);
       socket.off('join-request-rejected', handleJoinRequestRejected);
       socket.off('room-ended', handleRoomEnded);
+      socket.off('user-left', handleUserLeft);
       socket.off('connect', joinRoom);
     };
   }, [onNavigate]);
