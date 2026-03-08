@@ -1,5 +1,5 @@
 import express from 'express';
-import { createRoom, getRooms, getRoomById, joinRoom, inviteToRoom, startRoom, requestToJoin, approveJoinRequest, rejectJoinRequest } from '../controllers/roomController';
+import { createRoom, getRooms, getRoomById, joinRoom, inviteToRoom, startRoom, requestToJoin, approveJoinRequest, rejectJoinRequest, endRoom } from '../controllers/roomController';
 import { authMiddleware } from '../middleware/auth';
 
 const router = express.Router();
@@ -14,5 +14,6 @@ router.post('/invite/:friendId', authMiddleware, inviteToRoom);
 router.post('/:id/request-join', authMiddleware, requestToJoin);
 router.post('/:id/approve-request/:userId', authMiddleware, approveJoinRequest);
 router.post('/:id/reject-request/:userId', authMiddleware, rejectJoinRequest);
+router.post('/:id/end', authMiddleware, endRoom);
 
 export default router;

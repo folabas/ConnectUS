@@ -344,6 +344,19 @@ export const roomApi = {
 
         return response.json();
     },
+
+    // End a room (host only)
+    end: async (token: string, roomId: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/rooms/${roomId}/end`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        return response.json();
+    },
 };
 
 // Friend API Service

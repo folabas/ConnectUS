@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import type { ComponentType, SVGProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock, Loader2 } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, MessageCircle, Users, X, Heart, ThumbsUp, Laugh, Mic, MicOff, Video, VideoOff, PhoneOff, SkipBack, SkipForward, Copy, Check, Lock, Loader2, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Movie, RoomTheme, Screen, Room } from '../App';
@@ -112,15 +112,28 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     return null;
   }, [isMuxPlayer]);
 
-  const { localStream, peers, messages, isConnected, permissionError, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
+  const { localStream, peers, messages, isConnected, permissionError, retry, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
 
   useEffect(() => {
     if (permissionError === 'Permission denied') {
-      toast.error('Camera/Microphone access was denied. Please check your browser settings and refresh.');
+      toast.error('Camera/Microphone access was denied.', {
+        description: 'Please click the lock icon in your browser address bar to allow permissions, then click retry.',
+        action: {
+          label: 'Retry',
+          onClick: () => retry()
+        },
+        duration: 10000
+      });
     } else if (permissionError === 'Device error') {
-      toast.error('Could not access media devices. Please ensure your camera and microphone are connected.');
+      toast.error('Could not access media devices.', {
+        description: 'Please ensure your camera and microphone are connected and not used by another app.',
+        action: {
+          label: 'Retry',
+          onClick: () => retry()
+        }
+      });
     }
-  }, [permissionError]);
+  }, [permissionError, retry]);
 
   useEffect(() => {
     setActiveRoom(currentRoom || null);

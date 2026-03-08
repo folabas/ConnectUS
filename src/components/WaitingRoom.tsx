@@ -160,6 +160,14 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       }
     };
 
+    const handleRoomEnded = (data: { roomId: string; message: string }) => {
+      if (data.roomId === currentRoomId) {
+        toast.info(data.message || 'This session has been ended.');
+        localStorage.removeItem('currentRoomId');
+        onNavigate('library');
+      }
+    };
+
     // Register listeners FIRST
     socket.on('room-updated', handleRoomUpdate);
     socket.on('room-starting-soon', handleRoomStartingSoon);
@@ -167,6 +175,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     socket.on('join-request-received', handleJoinRequestReceived);
     socket.on('join-request-approved', handleJoinRequestApproved);
     socket.on('join-request-rejected', handleJoinRequestRejected);
+    socket.on('room-ended', handleRoomEnded);
 
     // THEN emit join-room (after listeners are set up)
     const joinRoom = () => {
@@ -190,6 +199,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       socket.off('join-request-received', handleJoinRequestReceived);
       socket.off('join-request-approved', handleJoinRequestApproved);
       socket.off('join-request-rejected', handleJoinRequestRejected);
+      socket.off('room-ended', handleRoomEnded);
       socket.off('connect', joinRoom);
     };
   }, [onNavigate]);
@@ -218,6 +228,30 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     } catch (error) {
       console.error("Failed to start room:", error);
       toast.error('Failed to start session');
+    }
+  };
+
+  const handleLeaveRoom = () => {
+    localStorage.removeItem('currentRoomId');
+    onNavigate('library');
+  };
+
+  const handleEndRoom = async () => {
+    if (!room?._id) return;
+    const token = tokenStorage.get();
+    if (!token) return;
+
+    try {
+      const response = await roomApi.end(token, room._id);
+      if (response.success) {
+        localStorage.removeItem('currentRoomId');
+        onNavigate('library');
+      } else {
+        toast.error(response.message || 'Failed to end session');
+      }
+    } catch (error) {
+      console.error('Error ending room:', error);
+      toast.error('Failed to end session');
     }
   };
 
@@ -589,22 +623,33 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
               <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-red-500/10 flex items-center justify-center">
                 <XCircle className="w-8 h-8 text-red-500" />
               </div>
-              <h2 className="text-2xl font-bold text-center mb-2">Leave Room?</h2>
+              <h2 className="text-2xl font-bold text-center mb-2">{isHost ? 'End Session?' : 'Leave Room?'}</h2>
               <p className="text-white/60 text-center mb-8">
-                Are you sure you want to leave this watch party?
+                {isHost
+                  ? 'Choose whether to end this session for everyone or just leave it running.'
+                  : 'Are you sure you want to leave this watch party?'}
               </p>
               <div className="flex flex-col gap-3">
+                {isHost && (
+                  <Button
+                    onClick={handleEndRoom}
+                    className="w-full h-12 bg-red-600 hover:bg-red-700 text-white rounded-2xl flex items-center justify-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    End for Everyone
+                  </Button>
+                )}
                 <Button
-                  onClick={() => onNavigate('library')}
-                  className="w-full h-12 bg-red-500 hover:bg-red-600 text-white rounded-2xl"
+                  onClick={handleLeaveRoom}
+                  className={`w-full h-12 ${isHost ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500 hover:bg-red-600'} text-white rounded-2xl`}
                 >
-                  Leave Session
+                  {isHost ? 'Just Leave' : 'Leave Session'}
                 </Button>
                 <Button
                   onClick={() => setShowExitConfirm(false)}
-                  className="w-full h-12 bg-white/5 hover:bg-white/10 text-white border-white/10 rounded-2xl"
+                  className="w-full h-12 bg-transparent hover:bg-white/5 text-white/40 border border-white/10 rounded-2xl"
                 >
-                  Stay in Session
+                  Cancel
                 </Button>
               </div>
             </motion.div>

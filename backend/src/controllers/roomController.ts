@@ -538,3 +538,46 @@ export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promis
         res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
+
+// POST /api/rooms/:id/end
+export const endRoom = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const hostId = req.user?.userId;
+
+        if (!hostId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const room = await Room.findById(id);
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // Only host can end the room
+        if (room.host.toString() !== hostId) {
+            res.status(403).json({ success: false, message: 'Only host can end this session' });
+            return;
+        }
+
+        // Update room status
+        room.status = 'finished';
+        await room.save();
+
+        // Notify all participants via socket
+        const io = req.app.get('io');
+        if (io) {
+            io.to(id).emit('room-ended', {
+                roomId: id,
+                message: 'This session has been ended by the host.'
+            });
+        }
+
+        res.status(200).json({ success: true, message: 'Room ended successfully' });
+    } catch (error: any) {
+        console.error('End room error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
