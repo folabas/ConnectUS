@@ -85,8 +85,9 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
 // GET /api/rooms
 export const getRooms = async (req: Request, res: Response): Promise<void> => {
     try {
-        // List active rooms (public and private rooms that are waiting or playing)
+        // Only list public rooms that are waiting or playing
         const rooms = await Room.find({
+            type: 'public',
             status: { $in: ['waiting', 'playing'] },
         })
             .populate('host', 'fullName avatarUrl')
