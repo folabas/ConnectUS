@@ -311,6 +311,10 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
             return;
         }
 
+        console.log('[START ROOM DEBUG] Room host:', room.host);
+        console.log('[START ROOM DEBUG] Room host toString:', room.host.toString());
+        console.log('[START ROOM DEBUG] Comparing:', room.host.toString(), '===', userId);
+
         if (room.host.toString() !== userId) {
             res.status(403).json({ success: false, message: 'Only host can start room' });
             return;
