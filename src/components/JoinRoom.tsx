@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, LogIn, Copy, Loader2, Users, Play, Lock, Globe } from 'lucide-react';
+import { ArrowLeft, LogIn, Copy, Loader2, Users, Play, Lock, Globe, Send, Check, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Screen } from '../App';
 import { roomApi, tokenStorage } from '@/services/api';
 import { toast } from 'sonner';
+import { signalingService } from '@/services/signaling';
 
 interface JoinRoomProps {
   onNavigate: (screen: Screen) => void;
@@ -34,6 +35,8 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
   const [joining, setJoining] = useState(false);
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [joinRequestStatus, setJoinRequestStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
+  const [pendingRoomId, setPendingRoomId] = useState<string | null>(null);
 
   // Parse invite link from URL query param on mount
   useEffect(() => {
@@ -68,6 +71,42 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
     }
   };
 
+  // Listen for join request approval/rejection
+  useEffect(() => {
+    if (joinRequestStatus !== 'pending' || !pendingRoomId) return;
+
+    const socket = signalingService.connect();
+    const userData = JSON.parse(localStorage.getItem('connectus_user') || '{}');
+    const userId = userData.userId;
+
+    const handleRequestApproved = (data: { roomId: string; room: any }) => {
+      if (data.roomId === pendingRoomId) {
+        toast.success('Your join request was approved!');
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('currentRoomId', data.room._id);
+        }
+        setJoinRequestStatus('approved');
+        onNavigate('waiting-room');
+      }
+    };
+
+    const handleRequestRejected = (data: { roomId: string }) => {
+      if (data.roomId === pendingRoomId) {
+        toast.error('Your join request was rejected');
+        setJoinRequestStatus('rejected');
+        setPendingRoomId(null);
+      }
+    };
+
+    socket.on('join-request-approved', handleRequestApproved);
+    socket.on('join-request-rejected', handleRequestRejected);
+
+    return () => {
+      socket.off('join-request-approved', handleRequestApproved);
+      socket.off('join-request-rejected', handleRequestRejected);
+    };
+  }, [joinRequestStatus, pendingRoomId, onNavigate]);
+
   const handleJoinRoom = async (roomId?: string, code?: string) => {
     const token = tokenStorage.get();
     if (!token) {
@@ -83,23 +122,82 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
 
     setJoining(true);
     try {
+      // If joining via roomId (public room click or from invite link without code), use direct join
+      // If joining via code, try direct join first - backend will handle approval flow
       const response = await roomApi.join(token, {
         roomId,
         code
       });
 
       if (response.success && response.data) {
-        toast.success('Joined room successfully!');
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('currentRoomId', response.data._id);
+        // Check if user was directly added (for public rooms) or needs approval
+        const room = response.data;
+        
+        // Check if user is already a participant (was approved or direct join)
+        const currentUser = JSON.parse(localStorage.getItem('connectus_user') || '{}');
+        const isParticipant = room.participants?.some((p: any) => {
+          const pId = p._id || p;
+          return pId === currentUser.userId;
+        });
+
+        if (isParticipant) {
+          toast.success('Joined room successfully!');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('currentRoomId', room._id);
+          }
+          onNavigate('waiting-room');
+        } else {
+          // User needs approval - store roomId and show pending state
+          toast.info('Join request sent! Waiting for host approval.');
+          setPendingRoomId(room._id);
+          setJoinRequestStatus('pending');
         }
-        onNavigate('waiting-room');
+      } else if (response.message?.includes('private') || response.message?.includes('invite')) {
+        // If room is private and requires invite, offer to send request
+        if (roomId) {
+          const requestResponse = await roomApi.requestToJoin(token, roomId);
+          if (requestResponse.success) {
+            toast.info('Join request sent! Waiting for host approval.');
+            setPendingRoomId(roomId);
+            setJoinRequestStatus('pending');
+          } else {
+            toast.error(requestResponse.message || 'Failed to send join request');
+          }
+        } else {
+          toast.error(response.message || 'Failed to join room');
+        }
       } else {
         toast.error(response.message || 'Failed to join room');
       }
     } catch (error) {
       console.error('Error joining room:', error);
       toast.error('Failed to join room');
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  const handleRequestToJoin = async (roomId: string) => {
+    const token = tokenStorage.get();
+    if (!token) {
+      toast.error('Please log in to join a room');
+      onNavigate('auth');
+      return;
+    }
+
+    setJoining(true);
+    try {
+      const response = await roomApi.requestToJoin(token, roomId);
+      if (response.success) {
+        toast.info('Join request sent! Waiting for host approval.');
+        setPendingRoomId(roomId);
+        setJoinRequestStatus('pending');
+      } else {
+        toast.error(response.message || 'Failed to send join request');
+      }
+    } catch (error) {
+      console.error('Error requesting to join:', error);
+      toast.error('Failed to send join request');
     } finally {
       setJoining(false);
     }
@@ -187,7 +285,61 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
         </div>
 
         <AnimatePresence mode="wait">
-          {activeTab === 'public' ? (
+          {joinRequestStatus === 'pending' ? (
+            <motion.div
+              key="pending"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-md mx-auto"
+            >
+              <div className="p-8 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-500/20 flex items-center justify-center">
+                  <Send className="w-8 h-8 text-yellow-500" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Request Sent</h2>
+                <p className="text-white/60 mb-6">Your join request is pending. You'll be notified when the host approves or rejects your request.</p>
+                <div className="flex items-center justify-center gap-2 text-yellow-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Waiting for approval...</span>
+                </div>
+                <Button
+                  onClick={() => {
+                    setJoinRequestStatus('idle');
+                    setPendingRoomId(null);
+                  }}
+                  className="w-full mt-6 bg-white/10 hover:bg-white/20 text-white rounded-2xl h-12"
+                >
+                  Cancel and Go Back
+                </Button>
+              </div>
+            </motion.div>
+          ) : joinRequestStatus === 'rejected' ? (
+            <motion.div
+              key="rejected"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-md mx-auto"
+            >
+              <div className="p-8 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-500/20 flex items-center justify-center">
+                  <X className="w-8 h-8 text-red-500" />
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Request Rejected</h2>
+                <p className="text-white/60 mb-6">The host has declined your join request.</p>
+                <Button
+                  onClick={() => {
+                    setJoinRequestStatus('idle');
+                    setPendingRoomId(null);
+                  }}
+                  className="w-full bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl h-12"
+                >
+                  Try Another Room
+                </Button>
+              </div>
+            </motion.div>
+          ) : activeTab === 'public' ? (
             <motion.div
               key="public"
               initial={{ opacity: 0, y: 20 }}

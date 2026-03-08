@@ -305,6 +305,45 @@ export const roomApi = {
 
         return response.json();
     },
+
+    // Request to join a private room
+    requestToJoin: async (token: string, roomId: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/rooms/${roomId}/request-join`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        return response.json();
+    },
+
+    // Approve a join request (host only)
+    approveJoinRequest: async (token: string, roomId: string, userId: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/rooms/${roomId}/approve-request/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        return response.json();
+    },
+
+    // Reject a join request (host only)
+    rejectJoinRequest: async (token: string, roomId: string, userId: string): Promise<ApiResponse<any>> => {
+        const response = await fetch(`${API_URL}/api/rooms/${roomId}/reject-request/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        return response.json();
+    },
 };
 
 // Friend API Service

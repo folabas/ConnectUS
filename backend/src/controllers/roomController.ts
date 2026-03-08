@@ -302,7 +302,7 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
         const { id } = req.params;
         const userId = req.user?.userId;
 
-        const room = await Room.findById(id);
+        const room = await Room.findById(id).populate('movie').populate('host', 'fullName avatarUrl');
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
@@ -319,7 +319,7 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
         // Get IO instance from app
         const io = req.app.get('io');
         if (io) {
-            // Broadcast start event
+            // Broadcast start event with FULL room data including movie
             io.to(id).emit('room-started', {
                 roomId: id,
                 message: "Session started",
@@ -336,6 +336,204 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
         res.status(200).json({ success: true, data: room });
     } catch (error: any) {
         console.error('Start room error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// POST /api/rooms/:id/request-join
+export const requestToJoin = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const room = await Room.findById(id);
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // Check if room is full
+        if (room.participants.length >= room.maxParticipants) {
+            res.status(400).json({ success: false, message: 'Room is full' });
+            return;
+        }
+
+        // Check if user is already a participant
+        const isAlreadyParticipant = room.participants.some(p => p.toString() === userId);
+        if (isAlreadyParticipant) {
+            res.status(400).json({ success: false, message: 'You are already in this room' });
+            return;
+        }
+
+        // Check if there's already a pending request
+        const existingRequest = room.joinRequests?.find(
+            r => r.user.toString() === userId && r.status === 'pending'
+        );
+        if (existingRequest) {
+            res.status(400).json({ success: false, message: 'You already have a pending request' });
+            return;
+        }
+
+        // Check if user was previously rejected
+        const rejectedRequest = room.joinRequests?.find(
+            r => r.user.toString() === userId && r.status === 'rejected'
+        );
+        if (rejectedRequest) {
+            res.status(403).json({ success: false, message: 'Your join request was rejected' });
+            return;
+        }
+
+        // Add join request
+        if (!room.joinRequests) {
+            room.joinRequests = [];
+        }
+        room.joinRequests.push({
+            user: userId as any,
+            requestedAt: new Date(),
+            status: 'pending'
+        });
+        await room.save();
+
+        // Notify host via socket
+        const io = req.app.get('io');
+        if (io) {
+            io.to(id).emit('join-request-received', {
+                roomId: id,
+                userId
+            });
+        }
+
+        res.status(200).json({ success: true, message: 'Join request sent' });
+    } catch (error: any) {
+        console.error('Request to join error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// POST /api/rooms/:id/approve-request/:userId
+export const approveJoinRequest = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id, userId } = req.params;
+        const hostId = req.user?.userId;
+
+        if (!hostId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const room = await Room.findById(id).populate('joinRequests.user', 'fullName avatarUrl');
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // Only host can approve requests
+        if (room.host.toString() !== hostId) {
+            res.status(403).json({ success: false, message: 'Only host can approve requests' });
+            return;
+        }
+
+        // Check if room is full
+        if (room.participants.length >= room.maxParticipants) {
+            res.status(400).json({ success: false, message: 'Room is full' });
+            return;
+        }
+
+        // Find the request
+        const request = room.joinRequests?.find(r => r.user.toString() === userId && r.status === 'pending');
+        if (!request) {
+            res.status(404).json({ success: false, message: 'Join request not found' });
+            return;
+        }
+
+        // Update request status
+        request.status = 'approved';
+
+        // Add user to participants
+        room.participants.push(userId as any);
+        await room.save();
+
+        // Re-populate to get full details
+        const updatedRoom = await Room.findById(id)
+            .populate('host', 'fullName avatarUrl')
+            .populate('movie', 'title image videoUrl duration')
+            .populate('participants', 'fullName avatarUrl')
+            .populate('joinRequests.user', 'fullName avatarUrl');
+
+        // Notify the user who requested to join via socket
+        const io = req.app.get('io');
+        if (io) {
+            io.to(id).emit('join-request-approved', {
+                roomId: id,
+                userId,
+                room: updatedRoom
+            });
+            // Also notify all participants about the new participant
+            io.to(id).emit('room-updated', {
+                roomId: id,
+                participantCount: updatedRoom!.participants.length,
+                participants: updatedRoom!.participants
+            });
+        }
+
+        res.status(200).json({ success: true, data: updatedRoom });
+    } catch (error: any) {
+        console.error('Approve join request error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// POST /api/rooms/:id/reject-request/:userId
+export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id, userId } = req.params;
+        const hostId = req.user?.userId;
+
+        if (!hostId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const room = await Room.findById(id).populate('joinRequests.user', 'fullName avatarUrl');
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // Only host can reject requests
+        if (room.host.toString() !== hostId) {
+            res.status(403).json({ success: false, message: 'Only host can reject requests' });
+            return;
+        }
+
+        // Find the request
+        const request = room.joinRequests?.find(r => r.user.toString() === userId && r.status === 'pending');
+        if (!request) {
+            res.status(404).json({ success: false, message: 'Join request not found' });
+            return;
+        }
+
+        // Update request status
+        request.status = 'rejected';
+        await room.save();
+
+        // Notify the user whose request was rejected via socket
+        const io = req.app.get('io');
+        if (io) {
+            io.to(id).emit('join-request-rejected', {
+                roomId: id,
+                userId
+            });
+        }
+
+        res.status(200).json({ success: true, message: 'Join request rejected' });
+    } catch (error: any) {
+        console.error('Reject join request error:', error);
         res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };

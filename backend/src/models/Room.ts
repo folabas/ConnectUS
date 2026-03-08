@@ -17,6 +17,11 @@ export interface IRoom extends Document {
     maxParticipants: number;
     adminEnabled: boolean;
     participants: mongoose.Types.ObjectId[];
+    joinRequests: {
+        user: mongoose.Types.ObjectId;
+        requestedAt: Date;
+        status: 'pending' | 'approved' | 'rejected';
+    }[];
     status: 'waiting' | 'scheduled' | 'active' | 'playing' | 'finished';
     createdAt: Date;
     updatedAt: Date;
@@ -77,6 +82,13 @@ const roomSchema = new Schema<IRoom>(
             {
                 type: Schema.Types.ObjectId,
                 ref: 'User',
+            },
+        ],
+        joinRequests: [
+            {
+                user: { type: Schema.Types.ObjectId, ref: 'User' },
+                requestedAt: { type: Date, default: Date.now },
+                status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }
             },
         ],
         status: {

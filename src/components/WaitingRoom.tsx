@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Users, Play, Video, VideoOff, Mic, MicOff, Loader2, UserPlus, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -23,6 +23,8 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [joinRequestPending, setJoinRequestPending] = useState(false);
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -44,6 +46,17 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
         const response = await roomApi.getById(token, roomId);
         if (response.success && response.data) {
           setRoom(response.data);
+          
+          // Check if current user has a pending request
+          const userData = JSON.parse(localStorage.getItem('connectus_user') || '{}');
+          const userId = userData.userId;
+          const pendingRequest = response.data.joinRequests?.find(
+            (r: any) => r.user._id === userId && r.status === 'pending'
+          );
+          if (pendingRequest) {
+            setJoinRequestPending(true);
+          }
+          
           if (onRoomUpdate) {
             onRoomUpdate(response.data);
           }
@@ -73,15 +86,20 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     const userId = userData.userId;
 
     // Set up ALL listeners FIRST before emitting join-room
-    const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
+    const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[]; movie?: any }) => {
       if (data.roomId === currentRoomId) {
         console.log('Room updated with new participants:', data);
         setRoom((prev: any) => {
           if (!prev) return prev;
-          return {
+          const updated = {
             ...prev,
             participants: data.participants
           };
+          // Also update parent state with movie if provided
+          if (data.movie && onRoomUpdate) {
+            onRoomUpdate(updated);
+          }
+          return updated;
         });
       }
     };
@@ -95,9 +113,49 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     const handleRoomStarted = (data: { roomId: string; message: string; room: any }) => {
       if (data.roomId === currentRoomId) {
         toast.success(data.message);
+        // Update local state
         setRoom(data.room);
+        // Update parent state so MovieWatchScreen gets the room with movie
+        if (onRoomUpdate) {
+          onRoomUpdate(data.room);
+        }
         // Navigate to watch screen when room starts
         onNavigate('watch');
+      }
+    };
+
+    // Handle new join requests (for host)
+    const handleJoinRequestReceived = async (data: { roomId: string; userId: string }) => {
+      if (data.roomId === currentRoomId) {
+        // Refresh room to get updated joinRequests
+        const token = tokenStorage.get();
+        if (token) {
+          const response = await roomApi.getById(token, currentRoomId);
+          if (response.success && response.data) {
+            setRoom(response.data);
+          }
+        }
+      }
+    };
+
+    // Handle join request approved (for the requester)
+    const handleJoinRequestApproved = (data: { roomId: string; room: any }) => {
+      if (data.roomId === currentRoomId) {
+        toast.success('Your join request was approved!');
+        setJoinRequestPending(false);
+        setRoom(data.room);
+        if (onRoomUpdate) {
+          onRoomUpdate(data.room);
+        }
+      }
+    };
+
+    // Handle join request rejected (for the requester)
+    const handleJoinRequestRejected = (data: { roomId: string }) => {
+      if (data.roomId === currentRoomId) {
+        toast.error('Your join request was rejected');
+        setJoinRequestPending(false);
+        onNavigate('library');
       }
     };
 
@@ -105,6 +163,9 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     socket.on('room-updated', handleRoomUpdate);
     socket.on('room-starting-soon', handleRoomStartingSoon);
     socket.on('room-started', handleRoomStarted);
+    socket.on('join-request-received', handleJoinRequestReceived);
+    socket.on('join-request-approved', handleJoinRequestApproved);
+    socket.on('join-request-rejected', handleJoinRequestRejected);
 
     // THEN emit join-room (after listeners are set up)
     const joinRoom = () => {
@@ -125,6 +186,9 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       socket.off('room-updated', handleRoomUpdate);
       socket.off('room-starting-soon', handleRoomStartingSoon);
       socket.off('room-started', handleRoomStarted);
+      socket.off('join-request-received', handleJoinRequestReceived);
+      socket.off('join-request-approved', handleJoinRequestApproved);
+      socket.off('join-request-rejected', handleJoinRequestRejected);
       socket.off('connect', joinRoom);
     };
   }, [onNavigate]);
@@ -153,6 +217,60 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     } catch (error) {
       console.error("Failed to start room:", error);
       toast.error('Failed to start session');
+    }
+  };
+
+  const handleApproveRequest = async (userId: string) => {
+    if (!room?._id || !processingRequest) {
+      setProcessingRequest(userId);
+    }
+    
+    try {
+      const token = tokenStorage.get();
+      if (!token || !room?._id) return;
+
+      const response = await roomApi.approveJoinRequest(token, room._id, userId);
+      if (response.success) {
+        toast.success('User joined the room');
+        setRoom(response.data);
+      } else {
+        toast.error(response.message || 'Failed to approve request');
+      }
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast.error('Failed to approve request');
+    } finally {
+      setProcessingRequest(null);
+    }
+  };
+
+  const handleRejectRequest = async (userId: string) => {
+    if (!room?._id || !processingRequest) {
+      setProcessingRequest(userId);
+    }
+
+    try {
+      const token = tokenStorage.get();
+      if (!token || !room?._id) return;
+
+      const response = await roomApi.rejectJoinRequest(token, room._id, userId);
+      if (response.success) {
+        toast.info('Join request rejected');
+        setRoom((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            joinRequests: prev.joinRequests?.filter((r: any) => r.user._id !== userId)
+          };
+        });
+      } else {
+        toast.error(response.message || 'Failed to reject request');
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Failed to reject request');
+    } finally {
+      setProcessingRequest(null);
     }
   };
 
@@ -186,6 +304,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const roomCode = room?.code || '---';
   const isPrivate = room?.type === 'private';
   const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/join/${roomCode}` : `connectus.live/join/${roomCode}`;
+  const pendingRequests = room?.joinRequests?.filter((r: any) => r.status === 'pending') || [];
 
   // Safe user access - use correct localStorage key
   const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('connectus_user') || '{}') : {};
@@ -310,6 +429,64 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                   )}
                 </div>
               </div>
+
+              {/* Join Requests Section (Host only) */}
+              {isHost && pendingRequests.length > 0 && (
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  className="p-6 rounded-3xl bg-yellow-500/10 backdrop-blur-xl border border-yellow-500/30"
+                >
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="w-5 h-5 text-yellow-500" />
+                    <h3 className="text-lg">Join Requests ({pendingRequests.length})</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {pendingRequests.map((request: any) => (
+                      <div
+                        key={request.user._id}
+                        className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-sm font-medium">
+                            {request.user.fullName ? request.user.fullName.substring(0, 2).toUpperCase() : '??'}
+                          </div>
+                          <div>
+                            <p className="font-medium">{request.user.fullName || 'Unknown User'}</p>
+                            <p className="text-xs text-white/40">
+                              Requested {new Date(request.requestedAt).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveRequest(request.user._id)}
+                            disabled={processingRequest === request.user._id}
+                            className="p-2 rounded-xl bg-green-500/20 hover:bg-green-500/30 text-green-500 transition-colors disabled:opacity-50"
+                          >
+                            {processingRequest === request.user._id ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-5 h-5" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleRejectRequest(request.user._id)}
+                            disabled={processingRequest === request.user._id}
+                            className="p-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-500 transition-colors disabled:opacity-50"
+                          >
+                            {processingRequest === request.user._id ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <XCircle className="w-5 h-5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
 
             {/* Right - Movie Info & Controls */}
@@ -368,6 +545,11 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                   >
                     Start Session
                   </Button>
+                ) : joinRequestPending ? (
+                  <div className="text-center p-4 rounded-2xl bg-yellow-500/10 text-yellow-500 flex flex-col items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Waiting for host approval...
+                  </div>
                 ) : (
                   <div className="text-center p-4 rounded-2xl bg-white/5 text-white/60">
                     Waiting for host to start...

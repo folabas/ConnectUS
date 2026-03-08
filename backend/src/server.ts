@@ -99,7 +99,7 @@ io.on('connection', (socket) => {
                 roomId,
                 { $addToSet: { participants: userId } },
                 { new: true }
-            ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl');
+            ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl').populate('movie', 'title image videoUrl muxPlaybackId duration');
 
             if (updatedRoom) {
                 // Emit FULL room data to all users in the room
@@ -108,6 +108,7 @@ io.on('connection', (socket) => {
                     participantCount: updatedRoom.participants.length,
                     participants: updatedRoom.participants,
                     host: updatedRoom.host,
+                    movie: updatedRoom.movie,
                     status: updatedRoom.status
                 });
             }
@@ -177,7 +178,8 @@ io.on('connection', (socket) => {
             text: payload.text,
             timestamp: payload.timestamp
         };
-        io.to(payload.roomId).emit('chat-message', message);
+        // Use socket.to to exclude sender (prevents duplication)
+        socket.to(payload.roomId).emit('chat-message', message);
     });
 
     // Video synchronization events - with host validation
@@ -249,7 +251,7 @@ io.on('connection', (socket) => {
                     roomId,
                     { $pull: { participants: disconnectedUserId } },
                     { new: true }
-                ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl');
+                ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl').populate('movie', 'title image videoUrl muxPlaybackId duration');
 
                 if (updatedRoom) {
                     socket.to(roomId).emit('room-updated', {
@@ -257,6 +259,7 @@ io.on('connection', (socket) => {
                         participantCount: updatedRoom.participants.length,
                         participants: updatedRoom.participants,
                         host: updatedRoom.host,
+                        movie: updatedRoom.movie,
                         status: updatedRoom.status
                     });
                 }

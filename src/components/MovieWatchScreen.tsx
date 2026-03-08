@@ -169,7 +169,7 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   useEffect(() => {
     if (!roomId) return;
 
-    const socket = signalingService.socket;
+    const socket = signalingService.connect();
     if (!socket) return;
 
     const handleVideoPlay = (payload: any) => {
