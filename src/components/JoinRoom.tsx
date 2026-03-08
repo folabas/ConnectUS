@@ -26,6 +26,8 @@ interface PublicRoom {
   };
   participants: any[];
   maxParticipants: number;
+  type: 'public' | 'private';
+  approvalRequired: boolean;
 }
 
 export function JoinRoom({ onNavigate }: JoinRoomProps) {
@@ -132,7 +134,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
       if (response.success && response.data) {
         // Check if user was directly added (for public rooms) or needs approval
         const room = response.data;
-        
+
         // Check if user is already a participant (was approved or direct join)
         const currentUser = JSON.parse(localStorage.getItem('connectus_user') || '{}');
         const isParticipant = room.participants?.some((p: any) => {
@@ -151,6 +153,20 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
           toast.info('Join request sent! Waiting for host approval.');
           setPendingRoomId(room._id);
           setJoinRequestStatus('pending');
+        }
+      } else if ((response as any).requiresApproval) {
+        // Explicitly handle "requires approval" response
+        const room = (response as any).data;
+        const roomId = room?._id || roomCode; // Use roomCode if roomId not available
+
+        // Call requestToJoin to ensure they are in the pending list
+        const requestResponse = await roomApi.requestToJoin(token, room?._id || roomId);
+        if (requestResponse.success) {
+          toast.info('Join request sent! Waiting for host approval.');
+          setPendingRoomId(room?._id || roomId);
+          setJoinRequestStatus('pending');
+        } else {
+          toast.error(requestResponse.message || 'Failed to send join request');
         }
       } else if (response.message?.includes('private') || response.message?.includes('invite')) {
         // If room is private and requires invite, offer to send request
@@ -206,7 +222,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
   const handleInviteLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInviteLink(value);
-    
+
     // Try to extract room code from various URL formats
     // Examples:
     // - connectus.live/join/ABC123
@@ -214,7 +230,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
     // - connectus.live?code=ABC123
     // - ABC123
     let extractedCode = '';
-    
+
     if (value.includes('/join/')) {
       // URL format: .../join/ABC123
       const parts = value.split('/join/');
@@ -227,7 +243,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
       // Direct code: ABC123XYZ
       extractedCode = value.toUpperCase();
     }
-    
+
     if (extractedCode && extractedCode.length >= 4) {
       setRoomCode(extractedCode);
     }
@@ -260,8 +276,8 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
             <button
               onClick={() => setActiveTab('public')}
               className={`px-6 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'public'
-                  ? 'bg-[#695CFF] text-white shadow-lg shadow-[#695CFF]/25'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                ? 'bg-[#695CFF] text-white shadow-lg shadow-[#695CFF]/25'
+                : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -272,8 +288,8 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
             <button
               onClick={() => setActiveTab('private')}
               className={`px-6 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'private'
-                  ? 'bg-[#695CFF] text-white shadow-lg shadow-[#695CFF]/25'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                ? 'bg-[#695CFF] text-white shadow-lg shadow-[#695CFF]/25'
+                : 'text-white/60 hover:text-white hover:bg-white/5'
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -409,6 +425,11 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : room.participants.length >= room.maxParticipants ? (
                           'Room Full'
+                        ) : room.type === 'private' || room.approvalRequired ? (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Ask to Join
+                          </>
                         ) : (
                           <>
                             <Play className="w-4 h-4 mr-2 fill-current" />

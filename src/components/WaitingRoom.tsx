@@ -94,7 +94,8 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
           if (!prev) return prev;
           const updated = {
             ...prev,
-            participants: data.participants
+            participants: data.participants,
+            movie: data.movie || prev.movie
           };
           // Also update parent state with movie if provided
           if (data.movie && onRoomUpdate) {

@@ -14,7 +14,7 @@ const generateRoomCode = (): string => {
 // POST /api/rooms
 export const createRoom = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { name, movieId, type, theme, startTime, maxParticipants, adminEnabled } = req.body;
+        const { name, movieId, type, theme, startTime, maxParticipants, adminEnabled, approvalRequired } = req.body;
         const userId = req.user?.userId;
 
         if (!userId) {
@@ -60,6 +60,7 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
             scheduledStartTime,
             maxParticipants,
             adminEnabled,
+            approvalRequired: approvalRequired ?? (type === 'private'), // Default to true for private rooms
             participants: [userId as any], // Host is automatically a participant
             status: roomStatus,
         });
@@ -84,9 +85,8 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
 // GET /api/rooms
 export const getRooms = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Only list public rooms that are waiting or playing
+        // List active rooms (public and private rooms that are waiting or playing)
         const rooms = await Room.find({
-            type: 'public',
             status: { $in: ['waiting', 'playing'] },
         })
             .populate('host', 'fullName avatarUrl')
@@ -112,9 +112,9 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 export const getRoomById = async (req: Request, res: Response): Promise<void> => {
     try {
         const room = await Room.findById(req.params.id)
-            .populate('host', 'fullName avatarUrl')
-            .populate('movie', 'title image videoUrl duration')
-            .populate('participants', 'fullName avatarUrl');
+            .populate('host', '_id fullName avatarUrl')
+            .populate('movie')
+            .populate('participants', '_id fullName avatarUrl');
 
         if (!room) {
             res.status(404).json({
@@ -174,6 +174,22 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             return;
         }
 
+        // Check if approval is required
+        if (room.approvalRequired && !code && room.host.toString() !== userId) {
+            const isParticipant = room.participants.some((p) => p.toString() === userId);
+            const isApproved = room.joinRequests?.some((r) => r.user.toString() === userId && r.status === 'approved');
+
+            if (!isParticipant && !isApproved) {
+                res.status(200).json({
+                    success: false,
+                    requiresApproval: true,
+                    message: 'Host approval is required to join this room.',
+                    data: room
+                });
+                return;
+            }
+        }
+
         // For private rooms joined via roomId (not code), check if user is already a participant or was previously approved
         if (room.type === 'private' && !code) {
             const isParticipant = room.participants.some((p) => p.toString() === userId);
@@ -226,8 +242,8 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             // Repopulate room to return full participant details
             room = await Room.findById(room._id)
                 .populate('movie')
-                .populate('participants', 'fullName avatarUrl')
-                .populate('host', 'fullName avatarUrl');
+                .populate('participants', '_id fullName avatarUrl')
+                .populate('host', '_id fullName avatarUrl');
         }
 
         res.status(200).json({
@@ -303,7 +319,10 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
     try {
         const { id } = req.params;
         const userId = req.user?.userId;
-        const room = await Room.findById(id).populate('movie').populate('host', 'fullName avatarUrl');
+        const room = await Room.findById(id)
+            .populate('movie')
+            .populate('host', '_id fullName avatarUrl')
+            .populate('participants', '_id fullName avatarUrl');
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
@@ -461,10 +480,10 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
 
         // Re-populate to get full details
         const updatedRoom = await Room.findById(id)
-            .populate('host', 'fullName avatarUrl')
-            .populate('movie', 'title image videoUrl duration')
-            .populate('participants', 'fullName avatarUrl')
-            .populate('joinRequests.user', 'fullName avatarUrl');
+            .populate('host', '_id fullName avatarUrl')
+            .populate('movie')
+            .populate('participants', '_id fullName avatarUrl')
+            .populate('joinRequests.user', '_id fullName avatarUrl');
 
         // Notify the user who requested to join via socket
         const io = req.app.get('io');
@@ -478,7 +497,10 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
             io.to(id).emit('room-updated', {
                 roomId: id,
                 participantCount: updatedRoom!.participants.length,
-                participants: updatedRoom!.participants
+                participants: updatedRoom!.participants,
+                movie: updatedRoom!.movie,
+                host: updatedRoom!.host,
+                status: updatedRoom!.status
             });
         }
 

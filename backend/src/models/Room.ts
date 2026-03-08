@@ -22,6 +22,7 @@ export interface IRoom extends Document {
         requestedAt: Date;
         status: 'pending' | 'approved' | 'rejected';
     }[];
+    approvalRequired: boolean;
     status: 'waiting' | 'scheduled' | 'active' | 'playing' | 'finished';
     createdAt: Date;
     updatedAt: Date;
@@ -91,6 +92,10 @@ const roomSchema = new Schema<IRoom>(
                 status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }
             },
         ],
+        approvalRequired: {
+            type: Boolean,
+            default: false,
+        },
         status: {
             type: String,
             enum: ['waiting', 'scheduled', 'active', 'playing', 'finished'],

@@ -99,7 +99,7 @@ io.on('connection', (socket) => {
                 roomId,
                 { $addToSet: { participants: userId } },
                 { new: true }
-            ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl').populate('movie', 'title image videoUrl muxPlaybackId duration');
+            ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');
 
             if (updatedRoom) {
                 // Emit FULL room data to all users in the room
@@ -251,7 +251,7 @@ io.on('connection', (socket) => {
                     roomId,
                     { $pull: { participants: disconnectedUserId } },
                     { new: true }
-                ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl').populate('movie', 'title image videoUrl muxPlaybackId duration');
+                ).populate('participants', '_id fullName avatarUrl').populate('host', '_id fullName avatarUrl').populate('movie');
 
                 if (updatedRoom) {
                     socket.to(roomId).emit('room-updated', {

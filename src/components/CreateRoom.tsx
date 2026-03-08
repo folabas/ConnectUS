@@ -48,6 +48,11 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
     const n = v ? parseInt(v, 10) : 4;
     return Math.min(4, Math.max(1, isNaN(n) ? 4 : n));
   });
+  const [approvalRequired, setApprovalRequired] = useState<boolean>(() => {
+    const v = typeof window !== 'undefined' ? localStorage.getItem('approvalRequired') : null;
+    if (v !== null) return v === 'true';
+    return roomType === 'private';
+  });
 
   // Fetch all movies for the carousel
   useEffect(() => {
@@ -137,7 +142,8 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
         theme: roomTheme,
         startTime: startTime || undefined,
         maxParticipants,
-        adminEnabled
+        adminEnabled,
+        approvalRequired
       });
 
       if (response.success && response.data) {
@@ -349,7 +355,26 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                       setAdminEnabled(e.target.checked);
                       if (typeof window !== 'undefined') localStorage.setItem('adminEnabled', String(e.target.checked));
                     }}
-                    className="w-5 h-5"
+                    className="w-5 h-5 accent-[#695CFF]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-white/60 mb-2 block">Moderation</label>
+                <div className="flex items-center justify-between p-3 md:p-4 rounded-xl md:rounded-2xl bg-white/5 border border-white/10">
+                  <div className="space-y-0.5">
+                    <span className="text-sm text-white/80 block">Require Approval to Join</span>
+                    <span className="text-[10px] text-white/40 block">Host must manually approve each participant</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={approvalRequired}
+                    onChange={(e) => {
+                      setApprovalRequired(e.target.checked);
+                      if (typeof window !== 'undefined') localStorage.setItem('approvalRequired', String(e.target.checked));
+                    }}
+                    className="w-5 h-5 accent-[#695CFF]"
                   />
                 </div>
               </div>

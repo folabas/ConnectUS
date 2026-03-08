@@ -33,6 +33,7 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
     const [isConnected, setIsConnected] = useState(false);
 
     const peersRef = useRef<{ [socketId: string]: RTCPeerConnection }>({});
+    const candidateQueuesRef = useRef<{ [socketId: string]: RTCIceCandidate[] }>({});
     const localStreamRef = useRef<MediaStream | null>(null);
     const userIdRef = useRef(userId);
     const roomIdRef = useRef(roomId);
@@ -95,6 +96,7 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
         }
 
         peersRef.current[peerSocketId] = pc;
+        candidateQueuesRef.current[peerSocketId] = [];
 
         if (isInitiator) {
             pc.createOffer().then(offer => {
@@ -188,15 +190,27 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                     console.log('Received offer from:', payload.sender, 'Socket:', payload.senderSocketId);
                     const pc = createPeerConnection(payload.senderSocketId, payload.sender, false);
                     if (pc) {
-                        await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        signalingService.sendAnswer({
-                            roomId,
-                            targetSocketId: payload.senderSocketId,
-                            sdp: answer,
-                            sender: userId
-                        });
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+
+                            // Process queued candidates
+                            const queue = candidateQueuesRef.current[payload.senderSocketId] || [];
+                            while (queue.length > 0) {
+                                const candidate = queue.shift();
+                                if (candidate) await pc.addIceCandidate(candidate);
+                            }
+
+                            const answer = await pc.createAnswer();
+                            await pc.setLocalDescription(answer);
+                            signalingService.sendAnswer({
+                                roomId,
+                                targetSocketId: payload.senderSocketId,
+                                sdp: answer,
+                                sender: userId
+                            });
+                        } catch (err) {
+                            console.error('Error handling offer:', err);
+                        }
                     }
                 });
 
@@ -204,7 +218,18 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                     console.log('Received answer from:', payload.sender);
                     const pc = peersRef.current[payload.senderSocketId];
                     if (pc && pc.signalingState !== 'stable') {
-                        await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                        try {
+                            await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+
+                            // Process queued candidates
+                            const queue = candidateQueuesRef.current[payload.senderSocketId] || [];
+                            while (queue.length > 0) {
+                                const candidate = queue.shift();
+                                if (candidate) await pc.addIceCandidate(candidate);
+                            }
+                        } catch (err) {
+                            console.error('Error handling answer:', err);
+                        }
                     }
                 });
 
@@ -212,12 +237,16 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                     const pc = peersRef.current[payload.senderSocketId];
                     if (pc && payload.candidate) {
                         try {
-                            // Only add candidate if remote description is set
-                            if (pc.remoteDescription) {
-                                await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                            const iceCandidate = new RTCIceCandidate(payload.candidate);
+                            if (pc.remoteDescription && pc.remoteDescription.type) {
+                                await pc.addIceCandidate(iceCandidate);
                             } else {
-                                // Potentially queue candidates? For now just log
-                                console.log('Queuing/ignoring candidate as remote description is not set');
+                                // Queue the candidate
+                                if (!candidateQueuesRef.current[payload.senderSocketId]) {
+                                    candidateQueuesRef.current[payload.senderSocketId] = [];
+                                }
+                                candidateQueuesRef.current[payload.senderSocketId].push(iceCandidate);
+                                console.log('Queued candidate as remote description is not set yet');
                             }
                         } catch (e) {
                             console.error('Error adding ice candidate:', e);
@@ -232,6 +261,7 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                         pc.close();
                         delete peersRef.current[data.socketId];
                     }
+                    delete candidateQueuesRef.current[data.socketId];
                     setPeers(prev => prev.filter(p => p.socketId !== data.socketId));
                 });
 
@@ -245,12 +275,6 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
                 socket.on('disconnect', () => {
                     console.log('Socket disconnected in useWebRTC');
                     setIsConnected(false);
-                });
-
-                socket.on('reconnect', () => {
-                    console.log('Reconnected in useWebRTC');
-                    socket.emit('user-online', userId);
-                    socket.emit('join-room', roomId, userId);
                 });
 
             } catch (err) {
@@ -281,6 +305,7 @@ export const useWebRTC = (roomId: string | null, userId: string | null) => {
             localStreamRef.current?.getTracks().forEach(track => track.stop());
             Object.values(peersRef.current).forEach(pc => pc.close());
             peersRef.current = {};
+            candidateQueuesRef.current = {};
             setPeers([]);
             setLocalStream(null);
             setIsConnected(false);
