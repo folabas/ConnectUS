@@ -10,12 +10,6 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.{test,spec}.{ts,tsx}', '!tests/e2e/**'],
     exclude: ['tests/e2e/**'],
-    pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
     testTimeout: 60000,
     hookTimeout: 60000,
     coverage: {
