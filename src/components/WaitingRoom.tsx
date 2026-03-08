@@ -65,6 +65,20 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
           if (onRoomUpdate) {
             onRoomUpdate(response.data);
           }
+
+          // Check if previously approved
+          const isApproved = response.data.joinRequests?.some(
+            (r: any) => (r.user._id || r.user).toString() === userId?.toString() && r.status === 'approved'
+          );
+
+          // If was approved but not in participants (e.g. left and returned), auto-join
+          const isParticipant = response.data.participants?.some(
+            (p: any) => (p._id || p).toString() === userId?.toString()
+          );
+
+          if (isApproved && !isParticipant && response.data.status === 'playing') {
+            handleRequestJoin(); // This api call will add them back to participants
+          }
         } else {
           toast.error('Failed to load room details');
         }
