@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import type { ComponentType, SVGProps } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,6 +31,16 @@ interface FloatingReaction {
   x: number;
 }
 
+interface VideoController {
+  play: () => Promise<void>;
+  pause: () => void;
+  currentTime: number;
+  paused: boolean;
+  duration: number;
+  volume: number;
+  muted: boolean;
+}
+
 const VideoPlayer = ({ stream, muted = false, className }: { stream: MediaStream, muted?: boolean, className?: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -56,13 +66,16 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const [activeRoom, setActiveRoom] = useState<Room | null>(currentRoom || null);
   const [chatInput, setChatInput] = useState('');
   const [copied, setCopied] = useState(false);
+  const [muxPlayerReady, setMuxPlayerReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const muxPlayerRef = useRef<HTMLElement & { play?: () => Promise<void>; pause?: () => void; currentTime?: number; paused?: boolean; duration?: number; volume?: number; muted?: boolean }>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reactionIdRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const isSyncingRef = useRef(false);
+  const lastSyncTimeRef = useRef(0);
 
   const user = userStorage.get();
   const userId = user?.userId || null;
@@ -70,6 +83,29 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const isHost = activeRoom?.host?._id === userId || (activeRoom?.host as any) === userId;
   const isAdminEnabled = activeRoom?.adminEnabled || false;
   const canControl = !isAdminEnabled || isHost;
+
+  const isMuxPlayer = !!(selectedMovie as any)?.muxPlaybackId || !!(activeRoom?.movie as any)?.muxPlaybackId;
+
+  const getVideoController = useCallback((): VideoController | null => {
+    if (isMuxPlayer && muxPlayerRef.current) {
+      return {
+        play: async () => { if (muxPlayerRef.current?.play) await muxPlayerRef.current.play(); },
+        pause: () => { if (muxPlayerRef.current?.pause) muxPlayerRef.current.pause(); },
+        get currentTime() { return muxPlayerRef.current?.currentTime || 0; },
+        set currentTime(val) { if (muxPlayerRef.current) muxPlayerRef.current.currentTime = val; },
+        get paused() { return muxPlayerRef.current?.paused ?? true; },
+        get duration() { return muxPlayerRef.current?.duration || 0; },
+        get volume() { return muxPlayerRef.current?.volume || 1; },
+        set volume(val) { if (muxPlayerRef.current) muxPlayerRef.current.volume = val; },
+        get muted() { return muxPlayerRef.current?.muted ?? false; },
+        set muted(val) { if (muxPlayerRef.current) muxPlayerRef.current.muted = val; },
+      };
+    }
+    if (videoRef.current) {
+      return videoRef.current;
+    }
+    return null;
+  }, [isMuxPlayer]);
 
   const { localStream, peers, messages, toggleAudio, toggleVideo, sendChatMessage } = useWebRTC(roomId, userId);
 
@@ -107,81 +143,140 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     const socket = signalingService.socket;
     if (!socket) return;
 
-    socket.on('video-play', (payload: any) => {
-      if (payload.roomId === roomId && videoRef.current && !isSyncingRef.current) {
+    const handleVideoPlay = (payload: any) => {
+      if (payload.roomId === roomId && !isSyncingRef.current) {
+        const now = Date.now();
+        if (now - lastSyncTimeRef.current < 2000) return;
+        lastSyncTimeRef.current = now;
+        
         isSyncingRef.current = true;
-        videoRef.current.currentTime = payload.currentTime;
-        videoRef.current.play();
-        setIsPlaying(true);
-        setTimeout(() => { isSyncingRef.current = false; }, 100);
-      }
-    });
-
-    socket.on('video-pause', (payload: any) => {
-      if (payload.roomId === roomId && videoRef.current && !isSyncingRef.current) {
-        isSyncingRef.current = true;
-        videoRef.current.currentTime = payload.currentTime;
-        videoRef.current.pause();
-        setIsPlaying(false);
-        setTimeout(() => { isSyncingRef.current = false; }, 100);
-      }
-    });
-
-    socket.on('video-seek', (payload: any) => {
-      if (payload.roomId === roomId && videoRef.current && !isSyncingRef.current) {
-        isSyncingRef.current = true;
-        videoRef.current.currentTime = payload.currentTime;
-        setTimeout(() => { isSyncingRef.current = false; }, 100);
-      }
-    });
-
-    socket.on('video-sync-request', (payload: any) => {
-      // If we're the host, send current state
-      if (isHost && videoRef.current) {
-        socket.emit('video-sync-response', {
-          roomId,
-          currentTime: videoRef.current.currentTime,
-          isPlaying: !videoRef.current.paused
-        });
-      }
-    });
-
-    socket.on('video-sync-response', (payload: any) => {
-      if (payload.roomId === roomId && videoRef.current) {
-        videoRef.current.currentTime = payload.currentTime;
-        if (payload.isPlaying) {
-          videoRef.current.play();
+        const controller = getVideoController();
+        if (controller) {
+          controller.currentTime = payload.currentTime || 0;
+          controller.play().catch(console.error);
           setIsPlaying(true);
         }
+        setTimeout(() => { isSyncingRef.current = false; }, 500);
       }
-    });
+    };
 
-    socket.on('reaction', (payload: any) => {
-      if (payload.roomId === roomId) {
-        // Show reaction from other user
+    const handleVideoPause = (payload: any) => {
+      if (payload.roomId === roomId && !isSyncingRef.current) {
+        const now = Date.now();
+        if (now - lastSyncTimeRef.current < 2000) return;
+        lastSyncTimeRef.current = now;
+        
+        isSyncingRef.current = true;
+        const controller = getVideoController();
+        if (controller) {
+          controller.currentTime = payload.currentTime || 0;
+          controller.pause();
+          setIsPlaying(false);
+        }
+        setTimeout(() => { isSyncingRef.current = false; }, 500);
+      }
+    };
+
+    const handleVideoSeek = (payload: any) => {
+      if (payload.roomId === roomId && !isSyncingRef.current) {
+        const now = Date.now();
+        if (now - lastSyncTimeRef.current < 1000) return;
+        lastSyncTimeRef.current = now;
+        
+        isSyncingRef.current = true;
+        const controller = getVideoController();
+        if (controller) {
+          controller.currentTime = payload.currentTime || 0;
+          setCurrentTime(payload.currentTime || 0);
+        }
+        setTimeout(() => { isSyncingRef.current = false; }, 500);
+      }
+    };
+
+    const handleVideoSyncRequest = (payload: any) => {
+      if (isHost && payload.roomId === roomId) {
+        const controller = getVideoController();
+        if (controller) {
+          socket.emit('video-sync-response', {
+            roomId,
+            currentTime: controller.currentTime,
+            isPlaying: !controller.paused
+          });
+        }
+      }
+    };
+
+    const handleVideoSyncResponse = (payload: any) => {
+      if (payload.roomId === roomId && !isHost && !isSyncingRef.current) {
+        const now = Date.now();
+        if (now - lastSyncTimeRef.current < 2000) return;
+        lastSyncTimeRef.current = now;
+        
+        isSyncingRef.current = true;
+        const controller = getVideoController();
+        if (controller) {
+          controller.currentTime = payload.currentTime || 0;
+          setCurrentTime(payload.currentTime || 0);
+          if (payload.isPlaying) {
+            controller.play().catch(console.error);
+            setIsPlaying(true);
+          } else {
+            controller.pause();
+            setIsPlaying(false);
+          }
+        }
+        setTimeout(() => { isSyncingRef.current = false; }, 500);
+      }
+    };
+
+    const handleReaction = (payload: any) => {
+      if (payload.roomId === roomId && payload.userId !== userId) {
         const reactionData = reactions.find(r => r.name === payload.reaction);
         if (reactionData) {
           addReaction(reactionData.icon, reactionData.color);
         }
       }
-    });
+    };
 
-    // Request sync when joining
+    socket.on('video-play', handleVideoPlay);
+    socket.on('video-pause', handleVideoPause);
+    socket.on('video-seek', handleVideoSeek);
+    socket.on('video-sync-request', handleVideoSyncRequest);
+    socket.on('video-sync-response', handleVideoSyncResponse);
+    socket.on('reaction', handleReaction);
+
+    // Request sync when joining (for non-hosts)
     if (!isHost) {
       setTimeout(() => {
         socket.emit('video-sync-request', { roomId });
-      }, 1000);
+      }, 2000);
     }
 
     return () => {
-      socket.off('video-play');
-      socket.off('video-pause');
-      socket.off('video-seek');
-      socket.off('video-sync-request');
-      socket.off('video-sync-response');
-      socket.off('reaction');
+      socket.off('video-play', handleVideoPlay);
+      socket.off('video-pause', handleVideoPause);
+      socket.off('video-seek', handleVideoSeek);
+      socket.off('video-sync-request', handleVideoSyncRequest);
+      socket.off('video-sync-response', handleVideoSyncResponse);
+      socket.off('reaction', handleReaction);
     };
-  }, [roomId, isHost]);
+  }, [roomId, isHost, getVideoController, userId]);
+
+  // Poll for video state updates (for MuxPlayer)
+  useEffect(() => {
+    if (!isMuxPlayer) return;
+
+    const interval = setInterval(() => {
+      const controller = getVideoController();
+      if (controller) {
+        setCurrentTime(controller.currentTime);
+        setIsPlaying(!controller.paused);
+        setDuration(controller.duration || 0);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isMuxPlayer, getVideoController]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -230,26 +325,23 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
       return;
     }
 
-    const video = videoRef.current;
-    if (!video || isSyncingRef.current) return;
+    const controller = getVideoController();
+    if (!controller || isSyncingRef.current) return;
 
     const newIsPlaying = !isPlaying;
     if (newIsPlaying) {
-      video.play();
+      controller.play().catch(console.error);
     } else {
-      video.pause();
+      controller.pause();
     }
     setIsPlaying(newIsPlaying);
 
     // Broadcast to other users
-    if (roomId) {
-      const socket = signalingService.socket;
-      if (socket) {
-        socket.emit(newIsPlaying ? 'video-play' : 'video-pause', {
-          roomId,
-          currentTime: video.currentTime
-        });
-      }
+    if (roomId && signalingService.isConnected) {
+      signalingService.emitVideoEvent(newIsPlaying ? 'video-play' : 'video-pause', {
+        roomId,
+        currentTime: controller.currentTime
+      });
     }
   };
 
@@ -257,16 +349,18 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
     const newVolume = parseFloat(e.target.value);
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
+    const controller = getVideoController();
+    if (controller) {
+      controller.volume = newVolume;
     }
   };
 
   const toggleMute = () => {
     const newMuted = !isMuted;
     setIsMuted(newMuted);
-    if (videoRef.current) {
-      videoRef.current.muted = newMuted;
+    const controller = getVideoController();
+    if (controller) {
+      controller.muted = newMuted;
     }
   };
 
@@ -297,14 +391,15 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
 
     const time = parseFloat(e.target.value);
     setCurrentTime(time);
-    if (videoRef.current && !isSyncingRef.current) {
-      videoRef.current.currentTime = time;
+    
+    if (!isSyncingRef.current) {
+      const controller = getVideoController();
+      if (controller) {
+        controller.currentTime = time;
 
-      // Broadcast seek to other users
-      if (roomId) {
-        const socket = signalingService.socket;
-        if (socket) {
-          socket.emit('video-seek', {
+        // Broadcast seek to other users
+        if (roomId && signalingService.isConnected) {
+          signalingService.emitVideoEvent('video-seek', {
             roomId,
             currentTime: time
           });
@@ -314,8 +409,9 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   };
 
   const skip = (seconds: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime += seconds;
+    const controller = getVideoController();
+    if (controller) {
+      controller.currentTime += seconds;
     }
   };
 
@@ -415,25 +511,20 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
           {/* Video Element */}
           {movie.muxPlaybackId ? (
             <MuxPlayer
-              ref={videoRef as any}
+              ref={(el) => { muxPlayerRef.current = el; }}
               className="w-full h-full object-contain"
               playbackId={movie.muxPlaybackId}
               metadata={{
                 video_id: movie.id,
                 video_title: movie.title,
                 viewer_user_id: userId || 'anonymous',
-                env_key: process.env.NEXT_PUBLIC_MUX_ENV_KEY,
               }}
               streamType="on-demand"
               autoPlay={false}
-              onLoadedMetadata={(e: any) => {
-                // Access the underlying video element for MuxPlayer
-                const muxVideoElement = e.target;
-                if (muxVideoElement && videoRef.current !== muxVideoElement) {
-                  // Store reference to the actual video element
-                  (videoRef as any).current = muxVideoElement;
-                }
-              }}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onTimeUpdate={(e: any) => setCurrentTime(e.target?.currentTime || 0)}
+              onLoadedMetadata={(e: any) => setDuration(e.target?.duration || 0)}
             />
           ) : (
             <video
@@ -441,6 +532,10 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
               className="w-full h-full object-contain"
               src={movie.videoUrl}
               onClick={togglePlay}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
             />
           )}
 
