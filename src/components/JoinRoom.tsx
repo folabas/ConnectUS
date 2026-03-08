@@ -30,9 +30,20 @@ interface PublicRoom {
 export function JoinRoom({ onNavigate }: JoinRoomProps) {
   const [activeTab, setActiveTab] = useState<'public' | 'private'>('public');
   const [roomCode, setRoomCode] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
   const [joining, setJoining] = useState(false);
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
+
+  // Parse invite link from URL query param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      setRoomCode(code.toUpperCase());
+      setActiveTab('private');
+    }
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'public') {
@@ -91,6 +102,36 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
       toast.error('Failed to join room');
     } finally {
       setJoining(false);
+    }
+  };
+
+  const handleInviteLinkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInviteLink(value);
+    
+    // Try to extract room code from various URL formats
+    // Examples:
+    // - connectus.live/join/ABC123
+    // - https://connectus.live/join/ABC123
+    // - connectus.live?code=ABC123
+    // - ABC123
+    let extractedCode = '';
+    
+    if (value.includes('/join/')) {
+      // URL format: .../join/ABC123
+      const parts = value.split('/join/');
+      extractedCode = parts[parts.length - 1].split('?')[0].toUpperCase();
+    } else if (value.includes('code=')) {
+      // Query param format: ...?code=ABC123
+      const url = new URL(value.startsWith('http') ? value : `https://${value}`);
+      extractedCode = url.searchParams.get('code')?.toUpperCase() || '';
+    } else if (value.length >= 6) {
+      // Direct code: ABC123XYZ
+      extractedCode = value.toUpperCase();
+    }
+    
+    if (extractedCode && extractedCode.length >= 4) {
+      setRoomCode(extractedCode);
     }
   };
 
@@ -269,7 +310,9 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
                     <Copy className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
                     <Input
                       type="text"
-                      placeholder="connectus.app/room/..."
+                      placeholder="Paste invite link or room code..."
+                      value={inviteLink}
+                      onChange={handleInviteLinkChange}
                       className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
                     />
                   </div>

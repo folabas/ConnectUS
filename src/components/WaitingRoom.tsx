@@ -72,16 +72,17 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
     const userData = JSON.parse(userDataStr);
     const userId = userData.userId;
 
-    socket.emit('join-room', currentRoomId, userId);
-    console.log('Emitted join-room:', currentRoomId, userId);
-
+    // Set up ALL listeners FIRST before emitting join-room
     const handleRoomUpdate = (data: { roomId: string; participantCount: number; participants: any[] }) => {
       if (data.roomId === currentRoomId) {
-        console.log('Room updated:', data);
-        setRoom((prev: any) => prev ? {
-          ...prev,
-          participants: data.participants
-        } : null);
+        console.log('Room updated with new participants:', data);
+        setRoom((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            participants: data.participants
+          };
+        });
       }
     };
 
@@ -100,14 +101,31 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
       }
     };
 
+    // Register listeners FIRST
     socket.on('room-updated', handleRoomUpdate);
     socket.on('room-starting-soon', handleRoomStartingSoon);
     socket.on('room-started', handleRoomStarted);
 
+    // THEN emit join-room (after listeners are set up)
+    const joinRoom = () => {
+      socket.emit('user-online', userId);
+      setTimeout(() => {
+        socket.emit('join-room', currentRoomId, userId);
+      }, 200);
+    };
+
+    if (socket.connected) {
+      joinRoom();
+    } else {
+      socket.on('connect', joinRoom);
+    }
+
+    // Cleanup
     return () => {
       socket.off('room-updated', handleRoomUpdate);
       socket.off('room-starting-soon', handleRoomStartingSoon);
       socket.off('room-started', handleRoomStarted);
+      socket.off('connect', joinRoom);
     };
   }, [onNavigate]);
 
@@ -171,7 +189,14 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
 
   // Safe user access
   const currentUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('userData') || '{}') : {};
-  const isHost = room?.host?._id === currentUser.userId;
+  
+  // Handle both populated host (object with _id) and direct ObjectId (string)
+  // Convert both to strings for comparison to avoid type mismatch
+  const hostId = room?.host?._id?.toString() || room?.host?.toString();
+  const isHost = hostId === currentUser.userId?.toString();
+
+  // Debug log (remove in production)
+  console.log('Host check:', { hostId, currentUserId: currentUser.userId, isHost, roomHost: room?.host });
 
   return (
     <div className="min-h-screen bg-[#0D0D0F] text-white">

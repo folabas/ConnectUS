@@ -80,7 +80,11 @@ export function MovieWatchScreen({ onNavigate, selectedMovie, roomTheme, current
   const user = userStorage.get();
   const userId = user?.userId || null;
   const roomId = activeRoom?._id || (typeof window !== 'undefined' ? localStorage.getItem('currentRoomId') : null);
-  const isHost = activeRoom?.host?._id === userId || (activeRoom?.host as any) === userId;
+  
+  // Handle both populated host (object with _id) and direct ObjectId (string)
+  // Convert both to strings for comparison to avoid type mismatch
+  const hostId = activeRoom?.host?._id?.toString() || activeRoom?.host?.toString();
+  const isHost = hostId === userId?.toString();
   const isAdminEnabled = activeRoom?.adminEnabled || false;
   const canControl = !isAdminEnabled || isHost;
 

@@ -165,6 +165,27 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             return;
         }
 
+        // Check room status - don't allow joining finished rooms
+        if (room.status === 'finished') {
+            res.status(400).json({
+                success: false,
+                message: 'This room session has ended',
+            });
+            return;
+        }
+
+        // For private rooms joined via roomId (not code), check if user is already a participant
+        if (room.type === 'private' && !code) {
+            const isParticipant = room.participants.some((p) => p.toString() === userId);
+            if (!isParticipant) {
+                res.status(403).json({
+                    success: false,
+                    message: 'This is a private room. Please use an invite link or room code.',
+                });
+                return;
+            }
+        }
+
         // Check if room is full
         if (room.participants.length >= room.maxParticipants) {
             // Check if user is already in the room

@@ -99,14 +99,16 @@ io.on('connection', (socket) => {
                 roomId,
                 { $addToSet: { participants: userId } },
                 { new: true }
-            ).populate('participants', 'fullName avatarUrl');
+            ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl');
 
             if (updatedRoom) {
-                // Emit updated room data to all users in the room
+                // Emit FULL room data to all users in the room
                 io.to(roomId).emit('room-updated', {
                     roomId,
                     participantCount: updatedRoom.participants.length,
-                    participants: updatedRoom.participants
+                    participants: updatedRoom.participants,
+                    host: updatedRoom.host,
+                    status: updatedRoom.status
                 });
             }
         } catch (error) {
@@ -131,9 +133,9 @@ io.on('connection', (socket) => {
         });
         console.log(`User ${userId} joined room ${roomId} (socket ${socket.id})`);
 
-        socket.on('disconnect', () => {
-            socket.to(roomId).emit('user-disconnected', { userId, socketId: socket.id });
-        });
+        // Store roomId on socket for disconnect handling
+        socket.data.currentRoom = roomId;
+        socket.data.currentUserId = userId;
     });
 
     // Forward signaling payloads with senderSocketId
@@ -178,16 +180,44 @@ io.on('connection', (socket) => {
         io.to(payload.roomId).emit('chat-message', message);
     });
 
-    // Video synchronization events
-    socket.on('video-play', (payload) => {
+    // Video synchronization events - with host validation
+    socket.on('video-play', async (payload) => {
+        const userId = socketToUser.get(socket.id);
+        if (!userId) return;
+        
+        // Check if user is host
+        const room = await Room.findById(payload.roomId);
+        if (!room || room.host.toString() !== userId) {
+            socket.emit('error', { message: 'Only host can control playback' });
+            return;
+        }
+        
         socket.to(payload.roomId).emit('video-play', payload);
     });
 
-    socket.on('video-pause', (payload) => {
+    socket.on('video-pause', async (payload) => {
+        const userId = socketToUser.get(socket.id);
+        if (!userId) return;
+        
+        const room = await Room.findById(payload.roomId);
+        if (!room || room.host.toString() !== userId) {
+            socket.emit('error', { message: 'Only host can control playback' });
+            return;
+        }
+        
         socket.to(payload.roomId).emit('video-pause', payload);
     });
 
-    socket.on('video-seek', (payload) => {
+    socket.on('video-seek', async (payload) => {
+        const userId = socketToUser.get(socket.id);
+        if (!userId) return;
+        
+        const room = await Room.findById(payload.roomId);
+        if (!room || room.host.toString() !== userId) {
+            socket.emit('error', { message: 'Only host can control playback' });
+            return;
+        }
+        
         socket.to(payload.roomId).emit('video-seek', payload);
     });
 
@@ -199,15 +229,43 @@ io.on('connection', (socket) => {
         socket.to(payload.roomId).emit('video-sync-response', payload);
     });
 
-    // Reaction events
+    // Reaction events - open to all participants
     socket.on('reaction', (payload) => {
         socket.to(payload.roomId).emit('reaction', payload);
     });
 
     socket.on('disconnect', async () => {
-        // Optimized disconnect handling using reverse map O(1)
-        const disconnectedUserId = socketToUser.get(socket.id);
+        // Get the room they were in from socket data
+        const roomId = socket.data.currentRoom;
+        const disconnectedUserId = socketToUser.get(socket.id) || socket.data.currentUserId;
 
+        // If user was in a room, emit user-disconnected and update room
+        if (roomId && disconnectedUserId) {
+            socket.to(roomId).emit('user-disconnected', { userId: disconnectedUserId, socketId: socket.id });
+            
+            // Remove user from room participants in DB and emit update
+            try {
+                const updatedRoom = await Room.findByIdAndUpdate(
+                    roomId,
+                    { $pull: { participants: disconnectedUserId } },
+                    { new: true }
+                ).populate('participants', 'fullName avatarUrl').populate('host', 'fullName avatarUrl');
+
+                if (updatedRoom) {
+                    socket.to(roomId).emit('room-updated', {
+                        roomId,
+                        participantCount: updatedRoom.participants.length,
+                        participants: updatedRoom.participants,
+                        host: updatedRoom.host,
+                        status: updatedRoom.status
+                    });
+                }
+            } catch (error) {
+                console.error('Error updating room on disconnect:', error);
+            }
+        }
+
+        // Optimized disconnect handling using reverse map O(1)
         if (disconnectedUserId) {
             // Clean up maps
             userSockets.delete(disconnectedUserId);

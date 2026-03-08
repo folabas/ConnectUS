@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingPage } from './components/LandingPage';
 import { Authentication } from './components/Authentication';
 import { MovieLibrary } from './components/MovieLibrary';
@@ -8,6 +8,8 @@ import { MovieWatchScreen } from './components/MovieWatchScreen';
 import { Profile } from './components/Profile';
 import { Settings } from './components/Settings';
 import { JoinRoom } from './components/JoinRoom';
+import { signalingService } from './services/signaling';
+import { toast } from 'sonner';
 
 export type Screen = 'landing' | 'auth' | 'library' | 'create-room' | 'join-room' | 'waiting-room' | 'watch' | 'profile' | 'settings';
 
@@ -54,6 +56,55 @@ export default function App() {
     secondary: '#8B7FFF',
     name: 'Purple Dream'
   });
+
+  // Listen for real-time friend notifications
+  useEffect(() => {
+    const userData = typeof window !== 'undefined' ? localStorage.getItem('userData') : null;
+    if (!userData) return;
+
+    const socket = signalingService.connect();
+    const user = JSON.parse(userData);
+    
+    // Emit user online status
+    if (socket.connected) {
+      socket.emit('user-online', user.userId);
+    } else {
+      socket.on('connect', () => {
+        socket.emit('user-online', user.userId);
+      });
+    }
+
+    const handleFriendOnline = (friendId: string) => {
+      toast.info('A friend is online', { duration: 3000 });
+    };
+
+    const handleFriendOffline = (friendId: string) => {
+      // Optionally show offline notification
+    };
+
+    const handleRoomInvite = (data: { roomId: string; roomName: string; fromUserName: string }) => {
+      toast.info(`${data.fromUserName} invited you to "${data.roomName}"`, { 
+        duration: 5000,
+        action: {
+          label: 'Join',
+          onClick: () => {
+            localStorage.setItem('currentRoomId', data.roomId);
+            setCurrentScreen('waiting-room');
+          }
+        }
+      });
+    };
+
+    socket.on('friend-online', handleFriendOnline);
+    socket.on('friend-offline', handleFriendOffline);
+    socket.on('room-invite', handleRoomInvite);
+
+    return () => {
+      socket.off('friend-online', handleFriendOnline);
+      socket.off('friend-offline', handleFriendOffline);
+      socket.off('room-invite', handleRoomInvite);
+    };
+  }, []);
 
   const navigate = (screen: Screen) => {
     setCurrentScreen(screen);

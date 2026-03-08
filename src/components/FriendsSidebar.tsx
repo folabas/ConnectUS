@@ -47,7 +47,7 @@ export function FriendsSidebar({ isOpen, onClose }: FriendsSidebarProps) {
 
     // Socket listeners for real-time friend status updates
     useEffect(() => {
-        const socket = signalingService.socket;
+        const socket = signalingService.connect(); // Ensure socket is connected
         if (!socket) return;
 
         const handleFriendOnline = (friendUserId: string) => {

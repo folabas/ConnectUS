@@ -177,30 +177,31 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
   }
 
   return (
-    <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center p-8">
+    <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center p-4 md:p-8">
       <div className="w-full max-w-5xl">
         {/* Back Button */}
         <motion.button
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           onClick={() => onNavigate('library')}
-          className="mb-8 flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+          className="mb-4 md:mb-8 flex items-center gap-2 text-white/60 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Library
+          <span className="hidden sm:inline">Back to Library</span>
+          <span className="sm:hidden">Back</span>
         </motion.button>
 
-        <div className="grid lg:grid-cols-2 gap-12 items-start">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
           {/* Left Side - Form */}
           <motion.div
             initial={{ x: -40, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="space-y-8"
+            className="space-y-6 md:space-y-8"
           >
             <div>
-              <h1 className="text-4xl mb-3 tracking-tight">Create Room</h1>
-              <p className="text-white/60 text-lg">Set up your movie watching session</p>
+              <h1 className="text-2xl md:text-4xl mb-2 md:mb-3 tracking-tight">Create Room</h1>
+              <p className="text-white/60 text-sm md:text-lg">Set up your movie watching session</p>
             </div>
 
             <div className="space-y-4">
@@ -211,7 +212,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                   placeholder="Friday Movie Night"
                   value={roomName}
                   onChange={(e) => setRoomName(e.target.value)}
-                  className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                  className="h-12 md:h-14 bg-white/5 border-white/10 rounded-xl md:rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
                 />
               </div>
 
@@ -223,7 +224,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                       setRoomType('private');
                       if (typeof window !== 'undefined') localStorage.setItem('roomType', 'private');
                     }}
-                    className={`h-14 rounded-2xl flex items-center justify-center gap-2 transition-all ${roomType === 'private' ? 'text-white' : 'hover:bg-white/10 text-white'
+                    className={`h-12 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center gap-2 transition-all ${roomType === 'private' ? 'text-white' : 'hover:bg-white/10 text-white'
                       }`}
                     style={{
                       background:
@@ -237,14 +238,14 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                     }}
                   >
                     <Lock className="w-4 h-4" />
-                    Private
+                    <span className="text-sm md:text-base">Private</span>
                   </button>
                   <button
                     onClick={() => {
                       setRoomType('public');
                       if (typeof window !== 'undefined') localStorage.setItem('roomType', 'public');
                     }}
-                    className={`h-14 rounded-2xl flex items-center justify-center gap-2 transition-all ${roomType === 'public' ? 'text-white' : 'hover:bg-white/10 text-white'
+                    className={`h-12 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center gap-2 transition-all ${roomType === 'public' ? 'text-white' : 'hover:bg-white/10 text-white'
                       }`}
                     style={{
                       background:
@@ -258,7 +259,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                     }}
                   >
                     <Globe className="w-4 h-4" />
-                    Public
+                    <span className="text-sm md:text-base">Public</span>
                   </button>
                 </div>
               </div>
@@ -272,7 +273,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => onThemeChange(theme)}
-                      className={`w-12 h-12 rounded-full transition-all ${roomTheme.name === theme.name
+                      className={`w-10 h-10 md:w-12 md:h-12 rounded-full transition-all ${roomTheme.name === theme.name
                         ? 'ring-2 ring-white ring-offset-2 ring-offset-[#0D0D0F]'
                         : ''
                         }`}
@@ -288,7 +289,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
               <div>
                 <label className="text-sm text-white/60 mb-2 block">Start Time (Optional)</label>
                 <div className="relative">
-                  <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                  <Clock className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 md:w-5 h-4 md:h-5 text-white/40" />
                   <Input
                     type="time"
                     value={startTime}
@@ -296,52 +297,50 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                       setStartTime(e.target.value);
                       if (typeof window !== 'undefined') localStorage.setItem('startTime', e.target.value);
                     }}
-                    className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                    className="pl-10 md:pl-12 h-12 md:h-14 bg-white/5 border-white/10 rounded-xl md:rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
                   />
-                  <p className="mt-2 text-xs text-white/40">Time uses your local timezone</p>
+                  <p className="mt-2 text-xs text-white/40 hidden md:block">Time uses your local timezone</p>
                 </div>
               </div>
 
               <div>
                 <label className="text-sm text-white/60 mb-2 block">Max Participants</label>
                 <div className="relative">
-                  <Users className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+                  <Users className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-4 md:w-5 h-4 md:h-5 text-white/40" />
                   <Input
                     type="number"
                     min={1}
-                    max={4}
+                    max={10}
                     value={maxParticipants}
                     onChange={(e) => {
                       const val = e.target.value;
-                      // Allow empty input while typing
                       if (val === '') {
                         setMaxParticipants(1);
                         return;
                       }
                       const n = parseInt(val, 10);
                       if (!isNaN(n)) {
-                        const clamped = Math.min(4, Math.max(1, n));
+                        const clamped = Math.min(10, Math.max(1, n));
                         setMaxParticipants(clamped);
                         if (typeof window !== 'undefined') localStorage.setItem('maxParticipants', String(clamped));
                       }
                     }}
                     onBlur={(e) => {
-                      // Ensure valid value on blur
                       const val = e.target.value;
                       if (val === '' || isNaN(parseInt(val, 10))) {
                         setMaxParticipants(2);
                         if (typeof window !== 'undefined') localStorage.setItem('maxParticipants', '2');
                       }
                     }}
-                    className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                    className="pl-10 md:pl-12 h-12 md:h-14 bg-white/5 border-white/10 rounded-xl md:rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
                   />
-                  <p className="mt-2 text-xs text-white/40">Limit enforced to 4 participants</p>
+                  <p className="mt-2 text-xs text-white/40 hidden md:block">Limit enforced to 10 participants</p>
                 </div>
               </div>
 
               <div>
                 <label className="text-sm text-white/60 mb-2 block">Admin Controls</label>
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center justify-between p-3 md:p-4 rounded-xl md:rounded-2xl bg-white/5 border border-white/10">
                   <span className="text-sm text-white/80">Enable admin-only room management</span>
                   <input
                     type="checkbox"
@@ -359,7 +358,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
             <Button
               onClick={handleCreateRoom}
               disabled={creating}
-              className="w-full h-14 text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 md:h-14 text-white rounded-xl md:rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: `linear-gradient(135deg, ${roomTheme.primary}, ${roomTheme.secondary})`
               }}
@@ -367,7 +366,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
               {creating ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating Room...
+                  Creating...
                 </>
               ) : (
                 'Create Room'
@@ -388,7 +387,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                 <motion.div
                   initial={{ opacity: 0, x: -100 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="absolute left-0 top-12 w-48 h-64 rounded-2xl overflow-hidden blur-sm opacity-30 -z-10"
+                  className="absolute left-0 top-8 md:top-12 w-32 md:w-48 h-40 md:h-64 rounded-xl md:rounded-2xl overflow-hidden blur-sm opacity-30 -z-10 hidden md:block"
                 >
                   <ImageWithFallback
                     src={allMovies[currentIndex - 1].image}
@@ -402,7 +401,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                 <motion.div
                   initial={{ opacity: 0, x: 100 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="absolute right-0 top-12 w-48 h-64 rounded-2xl overflow-hidden blur-sm opacity-30 -z-10"
+                  className="absolute right-0 top-8 md:top-12 w-32 md:w-48 h-40 md:h-64 rounded-xl md:rounded-2xl overflow-hidden blur-sm opacity-30 -z-10 hidden md:block"
                 >
                   <ImageWithFallback
                     src={allMovies[currentIndex + 1].image}
@@ -418,14 +417,14 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.3 }}
-                className="relative p-8 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10"
+                className="relative p-4 md:p-8 rounded-2xl md:rounded-3xl bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/10"
               >
-                <div className="mb-6">
-                  <p className="text-sm text-white/60 mb-2">Selected Movie</p>
-                  <h2 className="text-2xl tracking-tight">{currentMovie.title}</h2>
+                <div className="mb-4 md:mb-6">
+                  <p className="text-sm text-white/60 mb-1 md:mb-2">Selected Movie</p>
+                  <h2 className="text-xl md:text-2xl tracking-tight">{currentMovie.title}</h2>
                 </div>
 
-                <div className="relative aspect-video rounded-2xl overflow-hidden mb-6 bg-white/5">
+                <div className="relative aspect-video rounded-xl md:rounded-2xl overflow-hidden mb-4 md:mb-6 bg-white/5">
                   <ImageWithFallback
                     src={currentMovie.image}
                     alt={currentMovie.title}
@@ -433,37 +432,37 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
                   />
                 </div>
 
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center justify-between py-3 border-t border-white/10">
-                    <span className="text-white/60">Duration</span>
-                    <span>{currentMovie.duration}</span>
+                <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
+                  <div className="flex items-center justify-between py-2 md:py-3 border-t border-white/10">
+                    <span className="text-white/60 text-sm">Duration</span>
+                    <span className="text-sm">{currentMovie.duration}</span>
                   </div>
-                  <div className="flex items-center justify-between py-3 border-t border-white/10">
-                    <span className="text-white/60">Rating</span>
-                    <span>★ {currentMovie.rating}</span>
+                  <div className="flex items-center justify-between py-2 md:py-3 border-t border-white/10">
+                    <span className="text-white/60 text-sm">Rating</span>
+                    <span className="text-sm">★ {currentMovie.rating}</span>
                   </div>
-                  <div className="flex items-center justify-between py-3 border-t border-white/10">
-                    <span className="text-white/60">Genre</span>
-                    <span>{currentMovie.genre}</span>
+                  <div className="flex items-center justify-between py-2 md:py-3 border-t border-white/10">
+                    <span className="text-white/60 text-sm">Genre</span>
+                    <span className="text-sm">{currentMovie.genre}</span>
                   </div>
                 </div>
 
                 {/* Navigation Buttons */}
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-2 md:gap-3">
                   <Button
                     onClick={handlePrevMovie}
                     variant="outline"
-                    className="flex-1 border-white/10 hover:bg-white/5 rounded-2xl text-white"
+                    className="flex-1 border-white/10 hover:bg-white/5 rounded-xl md:rounded-2xl text-white h-10 md:h-12"
                   >
                     <ChevronLeft className="w-4 h-4 mr-1" />
-                    Previous
+                    <span className="hidden sm:inline">Previous</span>
                   </Button>
                   <Button
                     onClick={handleNextMovie}
                     variant="outline"
-                    className="flex-1 border-white/10 hover:bg-white/5 rounded-2xl text-white"
+                    className="flex-1 border-white/10 hover:bg-white/5 rounded-xl md:rounded-2xl text-white h-10 md:h-12"
                   >
-                    Next
+                    <span className="hidden sm:inline">Next</span>
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </div>
@@ -471,7 +470,7 @@ export function CreateRoom({ onNavigate, selectedMovie, onMovieSelect, roomTheme
 
               {/* Ambient Glow */}
               <div
-                className="absolute -inset-4 blur-3xl -z-20 opacity-50"
+                className="absolute -inset-4 md:-inset-8 blur-2xl md:blur-3xl -z-20 opacity-50"
                 style={{
                   background: `radial-gradient(circle, ${roomTheme.primary}40 0%, transparent 70%)`
                 }}
