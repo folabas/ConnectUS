@@ -26,6 +26,7 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
   const [loading, setLoading] = useState(true);
   const [joinRequestPending, setJoinRequestPending] = useState(false);
   const [processingRequest, setProcessingRequest] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   const userData = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('connectus_user') || '{}') : {};
   const userId = userData.userId;
@@ -77,6 +78,22 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
 
     fetchRoom();
   }, [onNavigate, onRoomUpdate]);
+
+  // Handle auto-redirect if already approved and room is playing
+  useEffect(() => {
+    if (room?.status === 'playing' && !redirecting) {
+      const isParticipant = room.participants?.some(
+        (p: any) => (p._id || p).toString() === userId?.toString()
+      );
+      if (isParticipant) {
+        setRedirecting(true);
+        const timer = setTimeout(() => {
+          onNavigate('watch');
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [room?.status, room?.participants, userId, onNavigate, redirecting]);
 
   // Listen for real-time room updates via Socket.io
   useEffect(() => {
@@ -151,6 +168,10 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
         setRoom(data.room);
         if (onRoomUpdate) {
           onRoomUpdate(data.room);
+        }
+        if (data.room.status === 'playing') {
+          setRedirecting(true);
+          setTimeout(() => onNavigate('watch'), 1000);
         }
       }
     };
@@ -620,6 +641,11 @@ export function WaitingRoom({ onNavigate, selectedMovie, roomTheme, onRoomUpdate
                       Ask to Join
                     </Button>
                   )
+                ) : room.status === 'playing' || redirecting ? (
+                  <div className="text-center p-4 rounded-2xl bg-purple-500/10 text-purple-500 flex flex-col items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Joining live session...
+                  </div>
                 ) : (
                   <div className="text-center p-4 rounded-2xl bg-white/5 text-white/60">
                     Waiting for host to start...

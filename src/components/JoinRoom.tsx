@@ -147,6 +147,7 @@ export function JoinRoom({ onNavigate }: JoinRoomProps) {
         if (typeof window !== 'undefined' && roomIdToStore) {
           localStorage.setItem('currentRoomId', roomIdToStore);
         }
+
         onNavigate('waiting-room');
       } else if (response.message?.includes('private') || response.message?.includes('invite')) {
         // If room is private and requires invite, offer to send request
