@@ -301,21 +301,13 @@ export const startRoom = async (req: AuthRequest, res: Response): Promise<void> 
     try {
         const { id } = req.params;
         const userId = req.user?.userId;
-        
-        console.log('[START ROOM DEBUG] Request userId:', userId);
-        console.log('[START ROOM DEBUG] Room ID:', id);
-
         const room = await Room.findById(id).populate('movie').populate('host', 'fullName avatarUrl');
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
         }
 
-        console.log('[START ROOM DEBUG] Room host:', room.host);
-        console.log('[START ROOM DEBUG] Room host toString:', room.host.toString());
-        console.log('[START ROOM DEBUG] Comparing:', room.host.toString(), '===', userId);
-
-        if (room.host.toString() !== userId) {
+        if (room.host._id.toString() !== userId) {
             res.status(403).json({ success: false, message: 'Only host can start room' });
             return;
         }
