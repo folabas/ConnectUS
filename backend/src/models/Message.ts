@@ -49,4 +49,9 @@ const messageSchema = new Schema<IMessage>(
 // History is always read newest-last for one room.
 messageSchema.index({ room: 1, createdAt: 1 });
 
-export const Message = mongoose.model<IMessage>('Message', messageSchema);
+// Reuse an already-registered model rather than redefining it: Mongoose
+// throws OverwriteModelError on a second registration, which happens
+// whenever the module registry is reset (hot reload, test isolation).
+export const Message =
+    (mongoose.models.Message as mongoose.Model<IMessage>) ||
+    mongoose.model<IMessage>('Message', messageSchema);

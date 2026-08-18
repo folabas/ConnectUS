@@ -54,6 +54,7 @@ export default function WatchPage() {
     videoEnabled,
     toggleAudio,
     toggleVideo,
+    relayAvailable,
   } = useWebRTC(room?._id ?? null, phase === 'member');
 
   // Ask the room where it is once the film is ready to play.
@@ -246,6 +247,16 @@ export default function WatchPage() {
               </ControlButton>
             </div>
           </div>
+
+          {/* Without a TURN relay, peers behind symmetric NAT silently fail to
+              connect. Saying so beats leaving someone staring at a black tile
+              wondering whether their camera is broken. */}
+          {!relayAvailable && !mediaError && (
+            <p className="border-t border-white/10 bg-white/[0.04] px-4 py-2 text-xs text-white/50">
+              Video connections are direct only on this server. If someone&apos;s camera
+              never appears, their network is likely blocking peer-to-peer.
+            </p>
+          )}
 
           {mediaError && (
             <p className="border-t border-white/10 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">

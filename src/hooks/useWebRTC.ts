@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '@/providers/SocketProvider';
+import { webrtcApi } from '@/lib/api';
 
 export interface Peer {
   userId: string;
@@ -19,7 +20,14 @@ export interface Peer {
   stream: MediaStream;
 }
 
-const ICE_SERVERS: RTCConfiguration = {
+/**
+ * Used until the server's ICE configuration arrives, and if that request fails.
+ *
+ * STUN alone cannot connect peers behind symmetric NAT, so this is a floor
+ * rather than a working default — the server supplies TURN when it is
+ * configured. See backend/src/controllers/webrtcController.ts.
+ */
+const FALLBACK_ICE: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
@@ -40,6 +48,36 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
   const connections = useRef<Record<string, RTCPeerConnection>>({});
   const candidateQueue = useRef<Record<string, RTCIceCandidateInit[]>>({});
   const localStreamRef = useRef<MediaStream | null>(null);
+
+  // Held in a ref so a late-arriving config is picked up by connections created
+  // after it, without re-running the signalling effect and tearing down peers.
+  const iceConfig = useRef<RTCConfiguration>(FALLBACK_ICE);
+  const [relayAvailable, setRelayAvailable] = useState(true);
+
+  /* ---------------------------------------------------------------------- */
+  /* ICE configuration                                                      */
+  /* ---------------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    webrtcApi
+      .ice()
+      .then((config) => {
+        if (cancelled || !config?.iceServers?.length) return;
+        iceConfig.current = { iceServers: config.iceServers };
+        setRelayAvailable(config.turnConfigured);
+      })
+      .catch(() => {
+        // Keep the STUN fallback: most peers still connect without TURN.
+        setRelayAvailable(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
 
   /* ---------------------------------------------------------------------- */
   /* Local media                                                            */
@@ -102,7 +140,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       const existing = connections.current[socketId];
       if (existing) return existing;
 
-      const pc = new RTCPeerConnection(ICE_SERVERS);
+      const pc = new RTCPeerConnection(iceConfig.current);
       connections.current[socketId] = pc;
 
       localStreamRef.current
@@ -290,5 +328,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     videoEnabled,
     toggleAudio,
     toggleVideo,
+    /** False when no TURN relay is available, so some peers may not connect. */
+    relayAvailable,
   };
 }

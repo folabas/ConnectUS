@@ -99,4 +99,9 @@ userSchema.methods.comparePassword = async function (
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
-export const User = mongoose.model<IUser>('User', userSchema);
+// Reuse an already-registered model rather than redefining it: Mongoose
+// throws OverwriteModelError on a second registration, which happens
+// whenever the module registry is reset (hot reload, test isolation).
+export const User =
+    (mongoose.models.User as mongoose.Model<IUser>) ||
+    mongoose.model<IUser>('User', userSchema);

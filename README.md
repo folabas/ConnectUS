@@ -91,6 +91,22 @@ otherwise the element's own `seeking` event would be broadcast straight back and
 the room would oscillate. Drift under 0.75s is left alone — a micro-seek is more
 noticeable than the drift it corrects.
 
+### Video chat and TURN
+
+Peer connections fetch their ICE configuration from `GET /api/webrtc/ice` rather
+than hardcoding it, so TURN credentials can be rotated without a redeploy and are
+never baked into the bundle.
+
+Set `TURN_URLS` plus `TURN_SECRET` and the API issues credentials that expire
+after 12 hours, using the scheme coturn and Twilio both implement: the username
+is `<expiry>:<userId>` and the password is its HMAC-SHA1 under the shared secret.
+Static `TURN_USERNAME`/`TURN_PASSWORD` also work if that is what your provider
+gives you.
+
+Without TURN the app still runs on STUN alone, logs a warning at boot, and tells
+people in the room that connections are direct-only — but expect roughly 10-20%
+of users to fail to share camera and microphone.
+
 ### Where the films come from
 
 The library is backed by the Internet Archive's public-domain collections

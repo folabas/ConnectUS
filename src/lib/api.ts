@@ -421,6 +421,22 @@ export const friendApi = {
 };
 
 /* -------------------------------------------------------------------------- */
+/* WebRTC                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export interface IceConfig {
+  iceServers: RTCIceServer[];
+  ttl: number;
+  /** False means relay-only peers (symmetric NAT) will not connect. */
+  turnConfigured: boolean;
+}
+
+export const webrtcApi = {
+  /** ICE servers, including any time-limited TURN credentials. */
+  ice: () => request<IceConfig>('/api/webrtc/ice'),
+};
+
+/* -------------------------------------------------------------------------- */
 /* Notifications                                                              */
 /* -------------------------------------------------------------------------- */
 

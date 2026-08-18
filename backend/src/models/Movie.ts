@@ -80,4 +80,9 @@ const movieSchema = new Schema<IMovie>(
     }
 );
 
-export const Movie = mongoose.model<IMovie>('Movie', movieSchema);
+// Reuse an already-registered model rather than redefining it: Mongoose
+// throws OverwriteModelError on a second registration, which happens
+// whenever the module registry is reset (hot reload, test isolation).
+export const Movie =
+    (mongoose.models.Movie as mongoose.Model<IMovie>) ||
+    mongoose.model<IMovie>('Movie', movieSchema);

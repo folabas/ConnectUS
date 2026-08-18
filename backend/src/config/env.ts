@@ -41,6 +41,18 @@ const schema = z.object({
     // Mux is optional: uploads are disabled without it.
     MUX_TOKEN_ID: z.string().optional(),
     MUX_TOKEN_SECRET: z.string().optional(),
+
+    // WebRTC. STUN has a sane public default; TURN is optional but strongly
+    // recommended, since STUN alone cannot connect peers behind symmetric NAT.
+    STUN_URLS: z
+        .string()
+        .default('stun:stun.l.google.com:19302,stun:global.stun.twilio.com:3478'),
+    TURN_URLS: z.string().optional(),
+    /** Shared secret for time-limited credentials (coturn / Twilio scheme). */
+    TURN_SECRET: z.string().optional(),
+    /** Static credentials, used only when TURN_SECRET is absent. */
+    TURN_USERNAME: z.string().optional(),
+    TURN_PASSWORD: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -66,6 +78,14 @@ export const env = {
     emailEnabled: Boolean(raw.RESEND_API_KEY || (raw.EMAIL_HOST && raw.EMAIL_USER)),
     /** Direct uploads are configured. */
     muxEnabled: Boolean(raw.MUX_TOKEN_ID && raw.MUX_TOKEN_SECRET),
+
+    stunUrls: raw.STUN_URLS.split(',').map((u) => u.trim()).filter(Boolean),
+    turnUrls: (raw.TURN_URLS ?? '').split(',').map((u) => u.trim()).filter(Boolean),
+    /** TURN is usable: URLs plus either a secret or a static credential pair. */
+    turnEnabled: Boolean(
+        raw.TURN_URLS &&
+            (raw.TURN_SECRET || (raw.TURN_USERNAME && raw.TURN_PASSWORD)),
+    ),
 };
 
 export type Env = typeof env;

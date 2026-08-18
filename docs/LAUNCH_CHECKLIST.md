@@ -35,7 +35,7 @@ they block a launch.
 - [x] Frontend and backend typecheck clean; `next build` succeeds.
 - [x] `npm run lint` clean.
 - [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
-- [x] 40 backend tests pass (`cd backend && npm test`): socket handshake auth,
+- [x] 45 backend tests pass (`cd backend && npm test`): socket handshake auth,
       room membership enforcement, chat delivery/ordering/limits/persistence,
       playback authority, the approval flow including the populate and race
       regressions, watch-stat idempotency, and seed safety.
@@ -60,9 +60,13 @@ they block a launch.
 - [ ] **Configure email.** Password reset and invitations are no-ops without SMTP
       or a Resend key. Password reset in particular is a support burden if it
       silently does nothing.
-- [ ] **TURN server.** WebRTC currently uses public STUN only. Roughly 10–20% of
-      users behind symmetric NAT will fail to connect video without TURN
-      (Twilio, Metered, or self-hosted coturn). Chat and playback are unaffected.
+- [ ] **TURN credentials.** The application side is done: ICE config is served
+      from `GET /api/webrtc/ice`, time-limited credentials are implemented and
+      verified against an independently computed HMAC, and the UI says so when
+      no relay is available. What remains is buying or hosting one — Twilio,
+      Metered, or self-hosted coturn — and setting `TURN_URLS` + `TURN_SECRET`.
+      Until then roughly 10–20% of users cannot share camera or microphone.
+      Chat and playback are unaffected.
 - [ ] **If uploads open to the public:** a DMCA process and a designated agent
       registered with the Copyright Office. Users will upload ripped films.
 

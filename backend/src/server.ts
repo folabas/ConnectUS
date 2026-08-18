@@ -23,6 +23,11 @@ const startServer = async () => {
             console.log(`🌐 Allowed origins: ${env.allowedOrigins.join(', ')}`);
             if (!env.emailEnabled) console.log('✉️  Email disabled (no SMTP or Resend key)');
             if (!env.muxEnabled) console.log('📼 Uploads disabled (no Mux credentials)');
+            if (!env.turnEnabled) {
+                console.log(
+                    '📡 TURN not configured — peers behind symmetric NAT will fail to connect video',
+                );
+            }
         });
     } catch (error) {
         console.error('Failed to start server:', error);

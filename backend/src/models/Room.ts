@@ -107,4 +107,9 @@ const roomSchema = new Schema<IRoom>(
     }
 );
 
-export const Room = mongoose.model<IRoom>('Room', roomSchema);
+// Reuse an already-registered model rather than redefining it: Mongoose
+// throws OverwriteModelError on a second registration, which happens
+// whenever the module registry is reset (hot reload, test isolation).
+export const Room =
+    (mongoose.models.Room as mongoose.Model<IRoom>) ||
+    mongoose.model<IRoom>('Room', roomSchema);

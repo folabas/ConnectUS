@@ -20,6 +20,7 @@ import movieRoutes from './routes/movieRoutes';
 import roomRoutes from './routes/roomRoutes';
 import friendRoutes from './routes/friendRoutes';
 import notificationRoutes from './routes/notificationRoutes';
+import webrtcRoutes from './routes/webrtcRoutes';
 import { apiLimiter } from './middleware/rateLimit';
 import { registerSocketHandlers } from './sockets';
 
@@ -78,6 +79,7 @@ export function createApp(): AppBundle {
     app.use('/api/rooms', roomRoutes);
     app.use('/api/friends', friendRoutes);
     app.use('/api/notifications', notificationRoutes);
+    app.use('/api/webrtc', webrtcRoutes);
 
     app.get('/', (_req: Request, res: Response) => {
         res.status(200).json({ success: true, message: 'ConnectUS API is live! 🍿' });
