@@ -13,6 +13,12 @@
  *     is actually playable rather than by what the search returns
  */
 
+import {
+    ArchiveCache,
+    ARCHIVE_CACHE_TTL_DAYS,
+    ARCHIVE_UNKNOWN_TTL_MINUTES,
+} from '../models/ArchiveCache';
+
 const SEARCH_URL = 'https://archive.org/advancedsearch.php';
 const METADATA_URL = 'https://archive.org/metadata';
 const DOWNLOAD_URL = 'https://archive.org/download';
@@ -201,23 +207,81 @@ export async function resolveArchiveItem(
 }
 
 /**
+ * Resolve with a cache in front.
+ *
+ * Both outcomes are cached. A negative result matters as much as a positive
+ * one: an item with no playable derivative will still have none next week, and
+ * re-fetching its metadata on every search is the single biggest waste here.
+ */
+export async function resolveCached(identifier: string): Promise<ArchiveResult | null> {
+    try {
+        const cached = await ArchiveCache.findOne({ identifier }).lean();
+        if (cached) {
+            if (!cached.playable) return null;
+            return {
+                identifier,
+                title: cached.title ?? identifier,
+                year: cached.year,
+                description: cached.description,
+                image: cached.image ?? thumbnailFor(identifier),
+                duration: cached.duration,
+                videoUrl: cached.videoUrl,
+            };
+        }
+    } catch {
+        // A cache miss must never be fatal; fall through to a live lookup.
+    }
+
+    let resolved: ArchiveResult | null = null;
+    let timedOut = false;
+    try {
+        resolved = await resolveArchiveItem(identifier, RESOLVE_TIMEOUT_MS);
+    } catch {
+        // Not a negative answer — the item may well be playable, the archive was
+        // just slow. Cached briefly so a repeated search does not pay the full
+        // timeout again, but not for long enough to hide it permanently.
+        timedOut = true;
+    }
+
+    const expiresAt = timedOut
+        ? new Date(Date.now() + ARCHIVE_UNKNOWN_TTL_MINUTES * 60 * 1000)
+        : new Date(Date.now() + ARCHIVE_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000);
+    try {
+        await ArchiveCache.updateOne(
+            { identifier },
+            {
+                $set: {
+                    identifier,
+                    playable: Boolean(resolved?.videoUrl),
+                    title: resolved?.title,
+                    year: resolved?.year,
+                    description: resolved?.description,
+                    image: resolved?.image,
+                    duration: resolved?.duration,
+                    videoUrl: resolved?.videoUrl,
+                    expiresAt,
+                },
+            },
+            { upsert: true },
+        );
+    } catch {
+        // Caching is an optimisation; failing to write one is not an error.
+    }
+
+    return resolved?.videoUrl ? resolved : null;
+}
+
+/**
  * Search, then resolve each candidate, keeping only the playable ones.
- * Resolution runs concurrently — serially this would take 20 round trips.
+ * Resolution runs concurrently — serially this would be a dozen round trips.
  */
 export async function searchPlayable(query: string, page = 1): Promise<ArchiveResult[]> {
-    // 12 rather than 20: each candidate costs a metadata round trip, and a
-    // shorter list of results that arrives quickly beats a longer one that does not.
+    // 12 rather than 20: each uncached candidate costs a metadata round trip, and
+    // a shorter list that arrives quickly beats a longer one that does not.
     const candidates = await searchArchive(query, page, 12);
 
     const resolved = await Promise.all(
-        candidates.map(async (candidate) => {
-            try {
-                return await resolveArchiveItem(candidate.identifier, RESOLVE_TIMEOUT_MS);
-            } catch {
-                // One bad item should not fail the whole search.
-                return null;
-            }
-        }),
+        candidates.map((candidate) => resolveCached(candidate.identifier)),
     );
 
     return resolved.filter((item): item is ArchiveResult => item !== null && Boolean(item.videoUrl));

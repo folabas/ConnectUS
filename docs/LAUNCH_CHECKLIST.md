@@ -35,7 +35,7 @@ they block a launch.
 - [x] Frontend and backend typecheck clean; `next build` succeeds.
 - [x] `npm run lint` clean.
 - [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
-- [x] 45 backend tests pass (`cd backend && npm test`): socket handshake auth,
+- [x] 51 backend tests pass (`cd backend && npm test`): socket handshake auth,
       room membership enforcement, chat delivery/ordering/limits/persistence,
       playback authority, the approval flow including the populate and race
       regressions, watch-stat idempotency, and seed safety.
@@ -93,10 +93,11 @@ they block a launch.
   title (`Nosferatu (1922)`) stored a URL that serves `HTTP 206 Partial Content`
   with `Accept-Ranges: bytes` on a 493MB MP4 whose `moov` atom sits at byte 36,
   so it is faststart-optimised and seekable.
-- Archive search latency is ~6s (down from ~11s after capping per-item metadata
-  lookups at 5s and trimming the candidate list to 12). It is a third-party
-  dependency with no SLA; the UI shows a spinner throughout. If it needs to be
-  faster, cache resolved identifiers in Mongo and serve repeat searches locally.
+- Archive search latency: ~6s cold, ~1.4s warm, ~0.5s on the third run. Measured
+  directly, a single archive.org metadata lookup took 23s while the search itself
+  took 1s — resolution is the whole cost. Results are now cached in Mongo for a
+  week, and lookups that time out are cached for an hour so a repeat search does
+  not pay the same timeout again.
 
 ## Known limitations
 

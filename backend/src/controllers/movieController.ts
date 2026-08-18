@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Movie } from '../models/Movie';
 import { createDirectUpload, getAssetDetails, formatDuration, getUploadDetails } from '../utils/mux';
 import { AuthRequest } from '../middleware/auth';
-import { searchPlayable, resolveArchiveItem } from '../services/archiveService';
+import { searchPlayable, resolveCached } from '../services/archiveService';
 
 // Initial movie data for seeding
 const initialMovies = [
@@ -399,7 +399,7 @@ export const importFromCatalog = async (req: AuthRequest, res: Response): Promis
 
         // Re-resolve server-side rather than trusting a client-supplied URL,
         // which would otherwise let anyone point a library entry anywhere.
-        const item = await resolveArchiveItem(identifier);
+        const item = await resolveCached(identifier);
         if (!item?.videoUrl) {
             res.status(404).json({
                 success: false,
