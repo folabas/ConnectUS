@@ -1,9 +1,16 @@
 import { useState } from 'react';
+
+/** Transcoding poll cadence: up to 60s total. */
+const POLL_ATTEMPTS = 30;
+const POLL_INTERVAL_MS = 2000;
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Film, Loader2 } from 'lucide-react';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { movieApi, tokenStorage } from '@/services/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { errorMessage, movieApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface UploadMovieModalProps {
@@ -75,104 +82,70 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
             return;
         }
 
-        const token = tokenStorage.get();
-        if (!token) {
-            toast.error('Please log in to upload movies');
-            return;
-        }
-
         setUploading(true);
         setUploadProgress(0);
 
         try {
-            // Step 1: Get upload URL from backend
-            toast.info('Preparing upload...');
-            const uploadUrlResponse = await movieApi.createUploadUrl(token);
+            // Step 1: reserve a direct-upload slot.
+            toast.info('Preparing upload…');
+            const { uploadUrl, uploadId, assetId: initialAssetId } =
+                await movieApi.createUploadUrl();
 
-            if (!uploadUrlResponse.success || !uploadUrlResponse.data) {
-                throw new Error('Failed to create upload URL');
-            }
+            let assetId = initialAssetId;
 
-            const { uploadUrl, uploadId } = uploadUrlResponse.data;
-            let assetId = uploadUrlResponse.data.assetId;
+            // Step 2: send the file straight to the storage provider.
+            toast.info('Uploading video…');
+            await movieApi.uploadFile(uploadUrl, selectedFile, setUploadProgress);
 
-            // Step 2: Upload video to Mux
-            toast.info('Uploading video...');
-            await movieApi.uploadToMux(uploadUrl, selectedFile, (progress) => {
-                setUploadProgress(progress);
-            });
-
-            toast.success('Video uploaded successfully!');
             setUploadProgress(100);
             setProcessingAsset(true);
 
-            // Step 3: Poll for Asset ID if not immediately available
+            // Step 3: the asset id is assigned asynchronously after the bytes land.
             if (!assetId) {
-                toast.info('Finalizing upload...');
-                let attempts = 0;
-                const maxAttempts = 30;
-
-                while (attempts < maxAttempts) {
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                    const uploadDetails = await movieApi.getUploadDetails(token, uploadId);
-
-                    if (uploadDetails.success && uploadDetails.data && uploadDetails.data.assetId) {
-                        assetId = uploadDetails.data.assetId;
-                        break;
-                    }
-                    attempts++;
+                toast.info('Finalising upload…');
+                for (let attempt = 0; attempt < POLL_ATTEMPTS && !assetId; attempt++) {
+                    await wait(POLL_INTERVAL_MS);
+                    const upload = await movieApi.getUpload(uploadId);
+                    if (upload.assetId) assetId = upload.assetId;
                 }
             }
 
             if (!assetId) {
-                throw new Error('Failed to retrieve asset ID. Please try again.');
+                throw new Error('The upload did not finish in time. Please try again.');
             }
 
-            // Step 4: Wait for Mux to process the video and get asset details
-            toast.info('Processing video...');
-            let assetDetails;
-            let attempts = 0;
-            const maxAttempts = 30; // Wait up to 30 seconds
-
-            while (attempts < maxAttempts) {
-                await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
-
-                const assetResponse = await movieApi.getAssetDetails(token, assetId);
-
-                if (assetResponse.success && assetResponse.data) {
-                    assetDetails = assetResponse.data;
-
-                    // Check if asset is ready
-                    if (assetDetails.status === 'ready' && assetDetails.playbackId) {
-                        break;
-                    }
+            // Step 4: wait for transcoding to produce a playable rendition.
+            toast.info('Processing video…');
+            let asset: Awaited<ReturnType<typeof movieApi.getAsset>> | null = null;
+            for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+                await wait(POLL_INTERVAL_MS);
+                const current = await movieApi.getAsset(assetId);
+                if (current.status === 'ready' && current.playbackId) {
+                    asset = current;
+                    break;
                 }
-
-                attempts++;
             }
 
-            if (!assetDetails || !assetDetails.playbackId) {
-                throw new Error('Video processing timed out. Please try again later.');
+            if (!asset?.playbackId) {
+                throw new Error(
+                    'Processing is taking longer than expected. The film will appear in your library once it finishes.',
+                );
             }
 
-            // Step 5: Create movie in database
-            toast.info('Saving movie...');
-            const createResponse = await movieApi.create(token, {
+            // Step 5: record it in the library.
+            toast.info('Saving…');
+            await movieApi.create({
                 title: title.trim(),
                 genre,
                 muxAssetId: assetId,
-                muxPlaybackId: assetDetails.playbackId,
-                duration: assetDetails.duration,
-                image: posterUrl || assetDetails.thumbnailUrl,
+                muxPlaybackId: asset.playbackId,
+                duration: asset.duration,
+                image: posterUrl || asset.thumbnailUrl || undefined,
+                source: 'upload',
             });
 
-            if (!createResponse.success) {
-                throw new Error(createResponse.message || 'Failed to save movie');
-            }
+            toast.success('Movie uploaded.');
 
-            toast.success('Movie uploaded successfully!');
-
-            // Reset form
             setSelectedFile(null);
             setTitle('');
             setGenre('');
@@ -181,9 +154,8 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
 
             onSuccess();
             onClose();
-        } catch (error: any) {
-            console.error('Upload error:', error);
-            toast.error(error.message || 'Failed to upload movie');
+        } catch (error) {
+            toast.error(errorMessage(error));
         } finally {
             setUploading(false);
             setProcessingAsset(false);
