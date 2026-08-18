@@ -197,7 +197,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                             {/* Header */}
                             <div className="flex items-center justify-between p-6 border-b border-white/10">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#695CFF] to-[#8B7FFF] flex items-center justify-center">
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--brand-soft)] flex items-center justify-center">
                                         <Film className="w-5 h-5 text-white" />
                                     </div>
                                     <h2 className="text-2xl font-semibold text-white">Upload Movie</h2>
@@ -218,7 +218,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                                     <label className="text-sm text-white/60 mb-2 block">Video File *</label>
                                     <div
                                         className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${selectedFile
-                                            ? 'border-[#695CFF] bg-[#695CFF]/10'
+                                            ? 'border-[var(--brand)] bg-[var(--brand)]/10'
                                             : 'border-white/20 hover:border-white/40'
                                             }`}
                                     >
@@ -253,7 +253,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                                         value={genre}
                                         onChange={(e) => setGenre(e.target.value)}
                                         disabled={uploading}
-                                        className="w-full h-14 px-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:border-[#695CFF] focus:bg-white/10 transition-colors disabled:opacity-50"
+                                        className="w-full h-14 px-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:border-[var(--brand)] focus:bg-white/10 transition-colors disabled:opacity-50"
                                     >
                                         <option value="">Select a genre</option>
                                         {GENRES.map((g) => (
@@ -272,7 +272,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                                         onChange={(e) => setTitle(e.target.value)}
                                         disabled={uploading}
                                         placeholder="Auto-filled from filename"
-                                        className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                                        className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[var(--brand)] focus:bg-white/10"
                                     />
                                     <p className="mt-2 text-xs text-white/40">Leave blank to use filename</p>
                                 </div>
@@ -285,7 +285,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                                         onChange={(e) => setPosterUrl(e.target.value)}
                                         disabled={uploading}
                                         placeholder="https://example.com/poster.jpg"
-                                        className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                                        className="h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[var(--brand)] focus:bg-white/10"
                                     />
                                     <p className="mt-2 text-xs text-white/40">Leave blank to use auto-generated thumbnail</p>
                                 </div>
@@ -305,7 +305,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                                             <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${uploadProgress}%` }}
-                                                className="h-full bg-gradient-to-r from-[#695CFF] to-[#8B7FFF]"
+                                                className="h-full bg-gradient-to-r from-[var(--brand)] to-[var(--brand-soft)]"
                                             />
                                         </div>
                                     </div>
@@ -324,7 +324,7 @@ export function UploadMovieModal({ isOpen, onClose, onSuccess }: UploadMovieModa
                                 <Button
                                     onClick={handleUpload}
                                     disabled={uploading || !selectedFile || !genre}
-                                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#695CFF] to-[#8B7FFF] text-white transition-opacity disabled:opacity-50 flex items-center gap-2"
+                                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[var(--brand)] to-[var(--brand-soft)] text-white transition-opacity disabled:opacity-50 flex items-center gap-2"
                                 >
                                     {uploading ? (
                                         <>

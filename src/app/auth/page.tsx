@@ -113,10 +113,10 @@ function AuthForm() {
   const copy = COPY[mode];
 
   return (
-    <div className="flex min-h-screen bg-[#0D0D0F] text-white">
+    <div className="flex min-h-screen bg-[var(--bg)] text-white">
       {/* Brand panel */}
       <div className="relative hidden overflow-hidden lg:flex lg:flex-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#695CFF] via-[#8B7FFF] to-[#5a4de6]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand)] via-[var(--brand-soft)] to-[var(--brand-hover)]" />
         <div className="absolute left-20 top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
         <div className="absolute bottom-20 right-20 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
 
@@ -216,7 +216,7 @@ function AuthForm() {
                 <button
                   type="button"
                   onClick={() => setMode('forgot')}
-                  className={cn('rounded text-sm text-[#8B7FFF] hover:text-[#a99fff]', focusRing)}
+                  className={cn('rounded text-sm text-[var(--brand-soft)] hover:text-[#a99fff]', focusRing)}
                 >
                   Forgot password?
                 </button>
@@ -226,7 +226,7 @@ function AuthForm() {
             <Button
               type="submit"
               disabled={submitting}
-              className="h-12 w-full rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+              className="h-12 w-full rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : copy.submit}
             </Button>
@@ -238,7 +238,7 @@ function AuthForm() {
             {mode === 'forgot' ? 'Remembered it? ' : null}
             <button
               onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              className={cn('rounded text-[#8B7FFF] hover:text-[#a99fff]', focusRing)}
+              className={cn('rounded text-[var(--brand-soft)] hover:text-[#a99fff]', focusRing)}
             >
               {mode === 'signin' ? 'Sign up' : 'Sign in'}
             </button>
@@ -284,8 +284,8 @@ export default function AuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#0D0D0F]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#695CFF]" />
+        <div className="flex min-h-screen items-center justify-center bg-[var(--bg)]">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--brand)]" />
         </div>
       }
     >

@@ -76,7 +76,7 @@ export default function WatchPage() {
   if (phase === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
-        <Loader2 className="h-6 w-6 animate-spin text-[#695CFF]" />
+        <Loader2 className="h-6 w-6 animate-spin text-[var(--brand)]" />
       </div>
     );
   }
@@ -89,7 +89,7 @@ export default function WatchPage() {
           <p className="mt-2 text-white/60">{error ?? 'Ask the host for an invite.'}</p>
           <Button
             onClick={() => router.push('/rooms')}
-            className="mt-6 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+            className="mt-6 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
           >
             Back to rooms
           </Button>
@@ -189,7 +189,7 @@ export default function WatchPage() {
                 onClick={() => void videoRef.current?.play()}
                 className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
               >
-                <span className="rounded-xl bg-[#695CFF] px-6 py-3">Tap to join playback</span>
+                <span className="rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-6 py-3">Tap to join playback</span>
               </button>
             )}
           </div>
@@ -361,7 +361,7 @@ function PanelTab({
       className={cn(
         'flex-1 px-4 py-3 text-sm transition-colors',
         focusRing,
-        active ? 'border-b-2 border-[#695CFF] text-white' : 'text-white/50 hover:text-white',
+        active ? 'border-b-2 border-[var(--brand)] text-white' : 'text-white/50 hover:text-white',
       )}
     >
       {children}

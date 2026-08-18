@@ -50,7 +50,7 @@ export default function RoomLobbyPage() {
   }, [phase, room, router]);
 
   if (phase === 'loading') {
-    return <CenteredState><Loader2 className="h-6 w-6 animate-spin text-[#695CFF]" /></CenteredState>;
+    return <CenteredState><Loader2 className="h-6 w-6 animate-spin text-[var(--brand)]" /></CenteredState>;
   }
 
   if (phase === 'error' || phase === 'denied') {
@@ -63,7 +63,7 @@ export default function RoomLobbyPage() {
           <p className="mt-2 text-white/60">{error ?? 'Something went wrong.'}</p>
           <Button
             onClick={() => router.push('/rooms')}
-            className="mt-6 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+            className="mt-6 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
           >
             Back to rooms
           </Button>
@@ -99,7 +99,7 @@ export default function RoomLobbyPage() {
             >
               Leave
             </Button>
-            <Button onClick={() => void requestToJoin()} className="rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]">
+            <Button onClick={() => void requestToJoin()} className="rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]">
               Ask again
             </Button>
           </div>
@@ -111,7 +111,7 @@ export default function RoomLobbyPage() {
   const seatsLeft = room.maxParticipants - room.participants.length;
 
   return (
-    <div className="min-h-screen bg-[#0D0D0F] text-white">
+    <div className="min-h-screen bg-[var(--bg)] text-white">
       {/* Ambient wash in the room's theme */}
       <div
         className="pointer-events-none fixed inset-x-0 top-0 h-96 opacity-20 blur-[100px]"
@@ -146,7 +146,7 @@ export default function RoomLobbyPage() {
                     className="object-cover opacity-40"
                   />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#141417] via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface)] via-transparent to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5">
                   <Badge
                     className="mb-2 border-0 text-white"
@@ -229,7 +229,7 @@ export default function RoomLobbyPage() {
                     >
                       <Avatar className="h-9 w-9 border border-white/15">
                         <AvatarImage src={request.user.avatarUrl} alt="" />
-                        <AvatarFallback className="bg-[#695CFF] text-sm text-white">
+                        <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-sm text-white">
                           {initials(request.user.fullName)}
                         </AvatarFallback>
                       </Avatar>
@@ -395,7 +395,7 @@ function ShareCard({ code, roomId }: { code?: string; roomId: string }) {
 
 function CenteredState({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0D0D0F] p-4 text-white">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] p-4 text-white">
       {children}
     </div>
   );

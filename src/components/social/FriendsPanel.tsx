@@ -70,13 +70,13 @@ export function FriendsPanel() {
 
       <Tabs defaultValue="friends" className="mt-4">
         <TabsList className="border border-white/10 bg-white/[0.04]">
-          <TabsTrigger value="friends" className="data-[state=active]:bg-[#695CFF]">
+          <TabsTrigger value="friends" className="data-[state=active]:bg-[var(--brand)] text-[var(--brand-ink)]">
             All ({accepted.length})
           </TabsTrigger>
-          <TabsTrigger value="requests" className="data-[state=active]:bg-[#695CFF]">
+          <TabsTrigger value="requests" className="data-[state=active]:bg-[var(--brand)] text-[var(--brand-ink)]">
             Requests ({pending.length})
           </TabsTrigger>
-          <TabsTrigger value="add" className="data-[state=active]:bg-[#695CFF]">
+          <TabsTrigger value="add" className="data-[state=active]:bg-[var(--brand)] text-[var(--brand-ink)]">
             Add
           </TabsTrigger>
         </TabsList>
@@ -100,12 +100,12 @@ export function FriendsPanel() {
                   <div className="relative">
                     <Avatar className="h-9 w-9 border border-white/15">
                       <AvatarImage src={friend.user.avatarUrl} alt="" />
-                      <AvatarFallback className="bg-[#695CFF] text-sm text-white">
+                      <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-sm text-white">
                         {initials(friend.user.fullName || friend.user.email)}
                       </AvatarFallback>
                     </Avatar>
                     {friend.user.onlineStatus === 'online' && (
-                      <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#141417] bg-emerald-500" />
+                      <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--surface)] bg-emerald-500" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -134,7 +134,7 @@ export function FriendsPanel() {
                 >
                   <Avatar className="h-9 w-9 border border-white/15">
                     <AvatarImage src={request.user.avatarUrl} alt="" />
-                    <AvatarFallback className="bg-[#695CFF] text-sm text-white">
+                    <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-sm text-white">
                       {initials(request.user.fullName || request.user.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -220,7 +220,7 @@ function AddFriend({ onAdded }: { onAdded(): void }) {
         <Button
           type="submit"
           disabled={searching || !query.trim()}
-          className="h-12 rounded-xl bg-[#695CFF] px-5 hover:bg-[#5a4de6]"
+          className="h-12 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-5 hover:bg-[var(--brand-hover)]"
         >
           {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
         </Button>
@@ -238,7 +238,7 @@ function AddFriend({ onAdded }: { onAdded(): void }) {
               >
                 <Avatar className="h-9 w-9 border border-white/15">
                   <AvatarImage src={user.avatarUrl} alt="" />
-                  <AvatarFallback className="bg-[#695CFF] text-sm text-white">
+                  <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-sm text-white">
                     {initials(user.fullName || user.email)}
                   </AvatarFallback>
                 </Avatar>

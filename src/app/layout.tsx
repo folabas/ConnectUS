@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0D0D0F',
+  themeColor: 'var(--bg)',
   width: 'device-width',
   initialScale: 1,
 };
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-[#0D0D0F] antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-[var(--bg)] antialiased`}
       >
         <AuthProvider>
           <SocketProvider>{children}</SocketProvider>

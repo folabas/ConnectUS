@@ -14,12 +14,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Kept for the few places that need a value rather than a class. */
 export const BRAND = {
-  bg: '#0D0D0F',
-  surface: '#141417',
-  primary: '#695CFF',
-  primaryHover: '#5a4de6',
-  secondary: '#8B7FFF',
+  bg: 'var(--bg)',
+  surface: 'var(--surface)',
+  primary: 'var(--brand)',
+  primaryHover: 'var(--brand-hover)',
+  secondary: 'var(--brand-soft)',
+  ink: 'var(--brand-ink)',
+  accent: 'var(--accent)',
 } as const;
 
 /** Frosted panel used for cards, sidebars and modals. */
@@ -32,7 +35,7 @@ export const surfaceHover =
 /** Form fields. */
 export const field =
   'h-12 bg-white/5 border-white/10 rounded-xl text-white placeholder:text-white/40 ' +
-  'focus:border-[#695CFF] focus:bg-white/[0.07] transition-colors';
+  'focus:border-[var(--brand)] focus:bg-white/[0.07] transition-colors';
 
 export const textMuted = 'text-white/60';
 export const textFaint = 'text-white/40';
@@ -42,7 +45,7 @@ export const sectionTitle = 'text-lg font-medium tracking-tight text-white';
 
 /** Focus ring applied to bare buttons that are not shadcn `Button`s. */
 export const focusRing =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#695CFF] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0D0D0F]';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]';
 
 /** Colour per room status, for badges. */
 export const STATUS_STYLES: Record<string, { label: string; className: string }> = {

@@ -55,7 +55,7 @@ export function ReactionBar({
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            className="absolute bottom-12 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-[#141417] p-2 shadow-xl"
+            className="absolute bottom-12 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-[var(--surface)] p-2 shadow-xl"
           >
             {ALLOWED_REACTIONS.map((emoji) => (
               <button

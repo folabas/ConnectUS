@@ -7,6 +7,7 @@ import { Compass, Loader2, Lock, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { REGEXP_ONLY_DIGITS_AND_CHARS } from 'input-otp';
 import { errorMessage, roomApi } from '@/lib/api';
 import { cn, STATUS_STYLES, surface, surfaceHover } from '@/lib/ui';
 import type { Room } from '@/types';
@@ -71,7 +72,7 @@ export default function RoomsPage() {
           <div className={cn(surface, 'px-6 py-12 text-center')}>
             <p>Could not load rooms</p>
             <p className="mt-1 text-sm text-white/50">{error}</p>
-            <Button onClick={load} className="mt-5 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]">
+            <Button onClick={load} className="mt-5 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]">
               Try again
             </Button>
           </div>
@@ -84,7 +85,7 @@ export default function RoomsPage() {
             </p>
             <Button
               onClick={() => router.push('/library')}
-              className="mt-5 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+              className="mt-5 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
             >
               Browse the library
             </Button>
@@ -114,7 +115,7 @@ function RoomCard({ room, onOpen }: { room: Room; onOpen(): void }) {
         'group flex w-full flex-col overflow-hidden text-left disabled:cursor-not-allowed disabled:opacity-50',
       )}
     >
-      <div className="relative h-28 w-full overflow-hidden bg-gradient-to-br from-[#695CFF]/30 to-[#141417]">
+      <div className="relative h-28 w-full overflow-hidden bg-gradient-to-br from-[var(--brand)]/30 to-[var(--surface)]">
         {room.movie?.image && (
           <Image
             src={room.movie.image}
@@ -193,6 +194,13 @@ function JoinByCode() {
       <div className="mt-5 flex flex-wrap items-center gap-4">
         <InputOTP
           maxLength={CODE_LENGTH}
+          // Room codes are hex (crypto.randomBytes(...).toString('hex')), so they
+          // contain A-F. input-otp defaults to inputMode="numeric", which puts a
+          // number pad on phones and makes a code like BBEE43 impossible to type.
+          inputMode="text"
+          pattern={REGEXP_ONLY_DIGITS_AND_CHARS}
+          autoCapitalize="characters"
+          autoComplete="off"
           value={code}
           onChange={(value) => {
             const next = value.toUpperCase();

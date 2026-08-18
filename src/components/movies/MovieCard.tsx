@@ -29,7 +29,7 @@ export function MovieCard({
         focusRing,
       )}
     >
-      <div className="relative aspect-[2/3] overflow-hidden bg-gradient-to-br from-[#695CFF]/30 to-[#141417]">
+      <div className="relative aspect-[2/3] overflow-hidden bg-gradient-to-br from-[var(--brand)]/30 to-[var(--surface)]">
         {movie.image && !failed ? (
           <Image
             src={movie.image}
@@ -50,7 +50,7 @@ export function MovieCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
         <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#695CFF] shadow-lg">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand)] text-[var(--brand-ink)] shadow-lg">
             <Play className="ml-0.5 h-5 w-5 fill-white text-white" />
           </span>
         </div>

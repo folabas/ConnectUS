@@ -93,19 +93,19 @@ export default function LandingPage() {
   }, [status, router]);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0F] text-white">
+    <div className="min-h-screen bg-[var(--bg)] text-white">
       <SmoothScroll />
 
       {/* Skip link: the first tab stop on the page, for keyboard and screen
           reader users who should not have to walk the nav every time. */}
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[#695CFF] focus:px-4 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[var(--brand)] focus:px-4 focus:py-2"
       >
         Skip to content
       </a>
 
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#0D0D0F]/70 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[var(--bg)]/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
           <Logo size={30} />
           <div className="flex items-center gap-1 sm:gap-3">
@@ -122,7 +122,7 @@ export default function LandingPage() {
             </Link>
             <Button
               onClick={() => router.push('/auth')}
-              className="h-11 rounded-xl bg-white px-4 text-[#0D0D0F] hover:bg-white/90"
+              className="h-11 rounded-xl bg-white px-4 text-[var(--bg)] hover:bg-white/90"
             >
               Get started
             </Button>
@@ -138,7 +138,7 @@ export default function LandingPage() {
           {/* A single blurred gradient, not a stack of filters. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute left-1/2 top-[-12rem] h-[36rem] w-[52rem] -translate-x-1/2 rounded-full bg-[#695CFF]/18 blur-[130px]"
+            className="pointer-events-none absolute left-1/2 top-[-16rem] h-[30rem] w-[38rem] -translate-x-1/2 rounded-full bg-[var(--brand)]/10 blur-[120px]"
           />
 
           <div className="relative mx-auto max-w-6xl">
@@ -165,7 +165,7 @@ export default function LandingPage() {
                 >
                   Everyone on the
                   <br />
-                  same <span className="italic text-[#8B7FFF]">frame</span>.
+                  same <span className="italic text-[var(--brand-soft)]">frame</span>.
                 </motion.h1>
 
                 <motion.p
@@ -186,7 +186,7 @@ export default function LandingPage() {
                 >
                   <Button
                     onClick={() => router.push('/auth')}
-                    className="group h-12 rounded-xl bg-[#695CFF] px-6 text-base hover:bg-[#5a4de6] sm:w-auto"
+                    className="group h-12 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-6 text-base hover:bg-[var(--brand-hover)] sm:w-auto"
                   >
                     Start a watch party
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
@@ -251,10 +251,10 @@ export default function LandingPage() {
                 <Reveal
                   as="li"
                   key={capability.title}
-                  className="group bg-[#0D0D0F] p-7 transition-colors hover:bg-white/[0.03]"
+                  className="group bg-[var(--bg)] p-7 transition-colors hover:bg-white/[0.03]"
                 >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#695CFF]/12 transition-transform duration-300 group-hover:-translate-y-0.5">
-                    <capability.icon className="h-[18px] w-[18px] text-[#8B7FFF]" />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand)]/12 transition-transform duration-300 group-hover:-translate-y-0.5">
+                    <capability.icon className="h-[18px] w-[18px] text-[var(--brand-soft)]" />
                   </span>
                   <h3 className="mt-5 text-[17px] tracking-[-0.01em]">{capability.title}</h3>
                   <p className="mt-2 text-[15px] leading-relaxed text-white/50">
@@ -281,7 +281,7 @@ export default function LandingPage() {
               {STEPS.map((step) => (
                 <Reveal key={step.n}>
                   <div className="flex items-baseline gap-4">
-                    <span className="font-mono text-sm text-[#8B7FFF]">{step.n}</span>
+                    <span className="font-mono text-sm text-[var(--brand-soft)]">{step.n}</span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <h3 className="mt-5 text-xl tracking-[-0.01em]">{step.title}</h3>
@@ -316,16 +316,16 @@ export default function LandingPage() {
             <div className="relative overflow-hidden rounded-3xl border border-white/10 px-6 py-20 text-center sm:px-16 sm:py-28">
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(105,92,255,0.28),transparent_70%)]"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(227,154,46,0.16),transparent_70%)]"
               />
               <div className="relative">
                 <h2 className="mx-auto max-w-2xl text-3xl leading-[1.15] tracking-[-0.025em] sm:text-5xl">
                   Your next movie night is
-                  <span className="italic text-[#8B7FFF]"> one link</span> away.
+                  <span className="italic text-[var(--brand-soft)]"> one link</span> away.
                 </h2>
                 <Button
                   onClick={() => router.push('/auth')}
-                  className="group mt-10 h-12 rounded-xl bg-white px-7 text-base text-[#0D0D0F] hover:bg-white/90"
+                  className="group mt-10 h-12 rounded-xl bg-white px-7 text-base text-[var(--bg)] hover:bg-white/90"
                 >
                   Create your account
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />

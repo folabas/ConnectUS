@@ -44,7 +44,7 @@ export function SyncVisual({ className }: { className?: string }) {
       aria-hidden="true"
     >
       {/* Ambient wash. One blurred element, not a stack of filters. */}
-      <div className="pointer-events-none absolute inset-x-8 top-8 h-1/2 rounded-full bg-[#695CFF]/25 blur-[80px]" />
+      <div className="pointer-events-none absolute inset-x-8 top-8 h-1/2 rounded-full bg-[var(--brand)]/14 blur-[70px]" />
 
       {SCREENS.map((screen, index) => (
         <motion.div
@@ -57,15 +57,15 @@ export function SyncVisual({ className }: { className?: string }) {
         >
           <div
             className={cn(
-              'overflow-hidden rounded-xl border border-white/12 bg-[#141417] shadow-2xl sm:rounded-2xl',
+              'overflow-hidden rounded-xl border border-white/12 bg-[var(--surface)] shadow-2xl sm:rounded-2xl',
               screen.depth > 0 && 'opacity-70',
             )}
           >
             {/* The frame everyone is on. */}
-            <div className="relative aspect-video bg-[linear-gradient(135deg,#2a1f5e_0%,#4c3a9e_38%,#8B7FFF_66%,#f0a868_100%)]">
+            <div className="relative aspect-video bg-[linear-gradient(135deg,#2b1508_0%,#7a3418_34%,#d97a2b_64%,#f7d9a0_100%)]">
               {/* A suggestion of a scene: a horizon and a low sun. Two elements. */}
-              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#1a1030] to-transparent" />
-              <div className="absolute bottom-[28%] left-1/2 h-8 w-8 -translate-x-1/2 rounded-full bg-[#ffd9a0] opacity-90 blur-[2px]" />
+              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#170b04] to-transparent" />
+              <div className="absolute bottom-[28%] left-1/2 h-8 w-8 -translate-x-1/2 rounded-full bg-[#fff1d0] opacity-95 blur-[2px]" />
 
               {screen.depth === 0 && (
                 <div className="absolute inset-x-0 bottom-0 p-2 sm:p-3">
@@ -78,7 +78,7 @@ export function SyncVisual({ className }: { className?: string }) {
             <div className="flex items-center gap-1.5 px-2 py-1.5 sm:gap-2 sm:px-3 sm:py-2">
               <span
                 className="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-medium text-white sm:h-5 sm:w-5 sm:text-[9px]"
-                style={{ backgroundColor: screen.depth === 0 ? '#695CFF' : '#3a3a42' }}
+                style={{ backgroundColor: screen.depth === 0 ? 'var(--brand)' : '#3a3a42' }}
               >
                 {screen.name[0]}
               </span>
@@ -99,9 +99,9 @@ export function SyncVisual({ className }: { className?: string }) {
         initial={reduced ? false : { opacity: 0, y: 12, scale: 0.9 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.5, ease: EASE, delay: reduced ? 0 : 0.85 }}
-        className="absolute bottom-[2%] left-[1%] z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#141417]/95 px-3 py-1.5 shadow-xl backdrop-blur-sm sm:left-[6%]"
+        className="absolute bottom-[2%] left-[1%] z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[var(--surface)]/95 px-3 py-1.5 shadow-xl backdrop-blur-sm sm:left-[6%]"
       >
-        <MessageCircle className="h-3 w-3 text-[#8B7FFF]" />
+        <MessageCircle className="h-3 w-3 text-[var(--brand-soft)]" />
         <span className="text-[10px] text-white/80 sm:text-xs">
           wait, rewind that bit
         </span>

@@ -2,6 +2,40 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ---------------------------------------------------------------------------
+   Brand palette — projector amber on warm black.
+
+   Every brand colour in the app resolves to one of these. They were previously
+   hardcoded hex in 24 files (149 occurrences), which is why the first redesign
+   changed structure everywhere and the app still read as the same product:
+   colour is what the eye registers first, and none of it had moved.
+
+   The blacks are deliberately warm (#0A0908 rather than #0D0D0F) — a blue-black
+   reads as a dashboard, a warm black reads as a darkened room.
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Grounds */
+  --bg: #0A0908;
+  --surface: #15110D;
+  --elevated: #1F1811;
+
+  /* Projector amber: the light being thrown at the screen. */
+  --brand: #E39A2E;
+  --brand-hover: #C9821C;
+  --brand-soft: #F5C77A;
+  /* Text and icons sitting *on* an amber fill. Amber is a light colour, so its
+     foreground is near-black — white on amber fails contrast badly. */
+  --brand-ink: #171004;
+
+  /* Deep red, for genuinely urgent things only: live, recording, destructive. */
+  --accent: #C2352F;
+
+  /* Warm off-white rather than pure white, to sit with the warm grounds. */
+  --ink: #F7F2E9;
+}
+
+
 :root {
   --font-size: 16px;
   --background: #ffffff;

@@ -90,7 +90,7 @@ export default function LibraryPage() {
               <TabsTrigger
                 key={g}
                 value={g}
-                className="rounded-lg px-3 py-1.5 text-sm data-[state=active]:bg-[#695CFF] data-[state=active]:text-white"
+                className="rounded-lg px-3 py-1.5 text-sm data-[state=active]:bg-[var(--brand)] data-[state=active]:text-[var(--brand-ink)]"
               >
                 {g}
               </TabsTrigger>
@@ -142,13 +142,13 @@ function MovieDetail({
     <Sheet open={Boolean(movie)} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="w-full border-white/10 bg-[#141417] text-white sm:max-w-md"
+        className="w-full border-white/10 bg-[var(--surface)] text-white sm:max-w-md"
       >
         {movie && (
           <>
             <SheetTitle className="sr-only">{movie.title}</SheetTitle>
             <div className="space-y-5 overflow-y-auto p-6">
-              <div className="relative aspect-video overflow-hidden rounded-2xl bg-gradient-to-br from-[#695CFF]/30 to-[#141417]">
+              <div className="relative aspect-video overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--brand)]/30 to-[var(--surface)]">
                 {movie.image && (
                   <Image src={movie.image} alt="" fill unoptimized className="object-cover" />
                 )}
@@ -177,7 +177,7 @@ function MovieDetail({
 
               <Button
                 onClick={() => onHost(movie)}
-                className="h-12 w-full rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+                className="h-12 w-full rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
               >
                 <Play className="mr-2 h-4 w-4" />
                 Host a room with this
@@ -234,8 +234,8 @@ function CatalogSearch({ onImported }: { onImported(movie: Movie): void }) {
   return (
     <section className={cn(surface, 'p-6')}>
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#695CFF]/15">
-          <Clapperboard className="h-5 w-5 text-[#8B7FFF]" />
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand)]/15">
+          <Clapperboard className="h-5 w-5 text-[var(--brand-soft)]" />
         </span>
         <div>
           <h2 className="text-lg tracking-tight">Add from the public-domain archive</h2>
@@ -256,7 +256,7 @@ function CatalogSearch({ onImported }: { onImported(movie: Movie): void }) {
         <Button
           type="submit"
           disabled={searching || !query.trim()}
-          className="h-12 shrink-0 rounded-xl bg-[#695CFF] px-5 hover:bg-[#5a4de6]"
+          className="h-12 shrink-0 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-5 hover:bg-[var(--brand-hover)]"
         >
           {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
         </Button>
@@ -340,7 +340,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry(): void }) 
       <p className="mt-1 max-w-sm text-sm text-white/50">{message}</p>
       <Button
         onClick={onRetry}
-        className="mt-5 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+        className="mt-5 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
       >
         Try again
       </Button>

@@ -43,21 +43,21 @@ export default function JoinByCodePage({ params }: { params: Promise<{ code: str
   }, [status, code, router]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0D0D0F] p-4 text-white">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] p-4 text-white">
       {error ? (
         <div className={cn(surface, 'max-w-md p-8 text-center')}>
           <h1 className="text-xl tracking-tight">That invite did not work</h1>
           <p className="mt-2 text-white/60">{error}</p>
           <Button
             onClick={() => router.push('/rooms')}
-            className="mt-6 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+            className="mt-6 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
           >
             Browse rooms instead
           </Button>
         </div>
       ) : (
         <div className="text-center">
-          <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#695CFF]" />
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-[var(--brand)]" />
           <p className="mt-4 text-sm text-white/50">Finding room {code.toUpperCase()}…</p>
         </div>
       )}

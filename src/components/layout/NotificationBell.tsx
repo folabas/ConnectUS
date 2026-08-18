@@ -80,7 +80,7 @@ export function NotificationBell() {
         >
           <Bell className="h-5 w-5" />
           {unread > 0 && (
-            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#695CFF] px-1 text-[10px] font-medium">
+            <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--brand)] text-[var(--brand-ink)] px-1 text-[10px] font-medium">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
@@ -89,7 +89,7 @@ export function NotificationBell() {
 
       <DropdownMenuContent
         align="end"
-        className="w-80 border-white/10 bg-[#141417] p-0 text-white"
+        className="w-80 border-white/10 bg-[var(--surface)] p-0 text-white"
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <p className="text-sm font-medium">Notifications</p>
@@ -117,7 +117,7 @@ export function NotificationBell() {
                     onClick={() => void open(notification)}
                     className={cn(
                       'w-full border-b border-white/5 px-4 py-3 text-left transition-colors hover:bg-white/5',
-                      !notification.read && 'bg-[#695CFF]/10',
+                      !notification.read && 'bg-[var(--brand)]/10',
                     )}
                   >
                     <p className="text-sm">

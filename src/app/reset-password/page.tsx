@@ -57,13 +57,13 @@ function ResetPasswordContent() {
 
     if (!token) {
         return (
-            <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center p-8">
+            <div className="min-h-screen bg-[var(--bg)] text-white flex items-center justify-center p-8">
                 <div className="text-center">
                     <h1 className="text-2xl font-bold mb-4">Invalid Reset Link</h1>
                     <p className="text-white/60 mb-6">This password reset link is invalid or has expired.</p>
                     <Button
                         onClick={() => router.push('/')}
-                        className="bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl"
+                        className="bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-ink)] rounded-2xl"
                     >
                         Back to Login
                     </Button>
@@ -74,7 +74,7 @@ function ResetPasswordContent() {
 
     if (isSuccess) {
         return (
-            <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center p-8">
+            <div className="min-h-screen bg-[var(--bg)] text-white flex items-center justify-center p-8">
                 <motion.div
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
@@ -91,7 +91,7 @@ function ResetPasswordContent() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center p-8">
+        <div className="min-h-screen bg-[var(--bg)] text-white flex items-center justify-center p-8">
             <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -118,7 +118,7 @@ function ResetPasswordContent() {
                             placeholder="New password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                            className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[var(--brand)] focus:bg-white/10"
                             minLength={6}
                             required
                         />
@@ -131,7 +131,7 @@ function ResetPasswordContent() {
                             placeholder="Confirm new password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[#695CFF] focus:bg-white/10"
+                            className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/40 focus:border-[var(--brand)] focus:bg-white/10"
                             minLength={6}
                             required
                         />
@@ -140,7 +140,7 @@ function ResetPasswordContent() {
                     <Button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full h-14 bg-[#695CFF] hover:bg-[#5a4de6] text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full h-14 bg-[var(--brand)] hover:bg-[var(--brand-hover)] text-[var(--brand-ink)] rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isLoading ? 'Resetting...' : 'Reset Password'}
                     </Button>
@@ -153,7 +153,7 @@ function ResetPasswordContent() {
 export default function ResetPasswordPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-[#0D0D0F] text-white flex items-center justify-center">
+            <div className="min-h-screen bg-[var(--bg)] text-white flex items-center justify-center">
                 <div className="text-white/60">Loading...</div>
             </div>
         }>

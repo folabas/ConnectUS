@@ -65,7 +65,7 @@ export default function ProfilePage() {
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
           <Avatar className="h-20 w-20 border-2 border-white/15">
             <AvatarImage src={user?.avatarUrl} alt="" />
-            <AvatarFallback className="bg-[#695CFF] text-2xl text-white">
+            <AvatarFallback className="bg-[var(--brand)] text-2xl text-[var(--brand-ink)]">
               {initials(user?.fullName || user?.email)}
             </AvatarFallback>
           </Avatar>
@@ -101,7 +101,7 @@ export default function ProfilePage() {
                   <Button
                     onClick={save}
                     disabled={saving}
-                    className="rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+                    className="rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
                   >
                     {saving ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -171,8 +171,8 @@ function StatCard({
 }) {
   return (
     <div className={cn(surface, 'flex items-center gap-4 p-5')}>
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#695CFF]/15">
-        <Icon className="h-5 w-5 text-[#8B7FFF]" />
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--brand)]/15">
+        <Icon className="h-5 w-5 text-[var(--brand-soft)]" />
       </span>
       <div>
         <p className="text-2xl tracking-tight">{value}</p>

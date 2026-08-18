@@ -113,19 +113,19 @@ export interface Notification {
 }
 
 export const DEFAULT_THEME: RoomTheme = {
-  primary: '#695CFF',
-  secondary: '#8B7FFF',
-  name: 'Purple Dream',
+  primary: '#E39A2E',
+  secondary: '#F5C77A',
+  name: 'Projector',
 };
 
 /** Themes offered when creating a room. */
 export const ROOM_THEMES: RoomTheme[] = [
-  { name: 'Purple Dream', primary: '#695CFF', secondary: '#8B7FFF' },
-  { name: 'Midnight Blue', primary: '#3B82F6', secondary: '#60A5FA' },
-  { name: 'Crimson', primary: '#EF4444', secondary: '#F87171' },
-  { name: 'Emerald', primary: '#10B981', secondary: '#34D399' },
-  { name: 'Sunset', primary: '#F59E0B', secondary: '#FBBF24' },
-  { name: 'Rose', primary: '#EC4899', secondary: '#F472B6' },
+  { name: 'Projector', primary: '#E39A2E', secondary: '#F5C77A' },
+  { name: 'Velvet', primary: '#C2352F', secondary: '#E8635C' },
+  { name: 'Nitrate', primary: '#D9C9A3', secondary: '#F0E6CE' },
+  { name: 'Neon Marquee', primary: '#E0518A', secondary: '#F58CB4' },
+  { name: 'Green Room', primary: '#3F8F6B', secondary: '#68BE96' },
+  { name: 'Midnight Screening', primary: '#4A6FA5', secondary: '#7FA0CE' },
 ];
 
 /** True when the room is in a state a participant can actually watch in. */

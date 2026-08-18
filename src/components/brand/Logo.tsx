@@ -57,8 +57,8 @@ export function LogoMark({
       {!monochrome && (
         <defs>
           <linearGradient id={GRADIENT_ID} x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#8B7FFF" />
-            <stop offset="1" stopColor="#5A4DE6" />
+            <stop stopColor="#F5C77A" />
+            <stop offset="1" stopColor="#D08A1E" />
           </linearGradient>
         </defs>
       )}
@@ -95,7 +95,7 @@ export function Logo({
         className="font-medium tracking-tight"
         style={{ fontSize: size * 0.6, letterSpacing: '-0.025em' }}
       >
-        Connect<span className={monochrome ? undefined : 'text-[#8B7FFF]'}>Us</span>
+        Connect<span className={monochrome ? undefined : 'text-[var(--brand-soft)]'}>Us</span>
       </span>
     </span>
   );

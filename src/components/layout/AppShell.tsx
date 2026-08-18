@@ -44,8 +44,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
 
   return (
-    <div className="min-h-screen bg-[#0D0D0F] text-white">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0D0D0F]/80 backdrop-blur-xl">
+    <div className="min-h-screen bg-[var(--bg)] text-white">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[var(--bg)]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
           <Link href="/library" className={cn('shrink-0 rounded-lg', focusRing)} aria-label="ConnectUs home">
             <Logo size={30} className="[&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto flex items-center gap-2">
             <Button
               onClick={() => router.push('/rooms/new')}
-              className="h-10 rounded-xl bg-[#695CFF] px-4 hover:bg-[#5a4de6]"
+              className="h-10 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-4 hover:bg-[var(--brand-hover)]"
             >
               <Plus className="h-4 w-4 sm:mr-1.5" />
               <span className="hidden sm:block">Host</span>
@@ -93,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <Avatar className="h-9 w-9 border border-white/15">
                     <AvatarImage src={user?.avatarUrl} alt="" />
-                    <AvatarFallback className="bg-[#695CFF] text-sm text-white">
+                    <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-sm text-white">
                       {initials(user?.fullName || user?.email)}
                     </AvatarFallback>
                   </Avatar>
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-56 border-white/10 bg-[#141417] text-white"
+                className="w-56 border-white/10 bg-[var(--surface)] text-white"
               >
                 <div className="px-2 py-1.5">
                   <p className="truncate text-sm">{user?.fullName || 'Your account'}</p>

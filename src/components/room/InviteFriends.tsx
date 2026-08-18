@@ -91,7 +91,7 @@ export function InviteFriends({ roomId }: { roomId: string }) {
               <li key={friend._id} className="flex items-center gap-3">
                 <Avatar className="h-8 w-8 border border-white/15">
                   <AvatarImage src={friend.user.avatarUrl} alt="" />
-                  <AvatarFallback className="bg-[#695CFF] text-xs text-white">
+                  <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-xs text-white">
                     {initials(friend.user.fullName || friend.user.email)}
                   </AvatarFallback>
                 </Avatar>
@@ -144,7 +144,7 @@ export function InviteFriends({ roomId }: { roomId: string }) {
           <Button
             type="submit"
             disabled={emailSending || !email.trim()}
-            className="h-10 w-10 shrink-0 rounded-xl bg-[#695CFF] p-0 hover:bg-[#5a4de6]"
+            className="h-10 w-10 shrink-0 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] p-0 hover:bg-[var(--brand-hover)]"
             aria-label="Send email invitation"
           >
             {emailSending ? (

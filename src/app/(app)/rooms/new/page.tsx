@@ -92,7 +92,7 @@ function CreateRoomForm() {
         </p>
         <Button
           onClick={() => router.push('/library')}
-          className="mt-5 rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+          className="mt-5 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
         >
           Browse the library
         </Button>
@@ -227,7 +227,7 @@ function CreateRoomForm() {
                     className={cn(
                       'relative h-12 w-12 rounded-xl transition-transform hover:scale-105',
                       focusRing,
-                      selected && 'ring-2 ring-white ring-offset-2 ring-offset-[#0D0D0F]',
+                      selected && 'ring-2 ring-white ring-offset-2 ring-offset-[var(--bg)]',
                     )}
                     style={{
                       background: `linear-gradient(135deg, ${option.primary}, ${option.secondary})`,
@@ -247,7 +247,7 @@ function CreateRoomForm() {
         {/* Summary */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className={cn(surface, 'overflow-hidden')}>
-            <div className="relative aspect-video bg-gradient-to-br from-[#695CFF]/30 to-[#141417]">
+            <div className="relative aspect-video bg-gradient-to-br from-[var(--brand)]/30 to-[var(--surface)]">
               {loadingMovie ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-white/40" />
@@ -282,7 +282,7 @@ function CreateRoomForm() {
               <Button
                 type="submit"
                 disabled={submitting || loadingMovie}
-                className="h-12 w-full rounded-xl bg-[#695CFF] hover:bg-[#5a4de6]"
+                className="h-12 w-full rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
                 style={{ backgroundColor: theme.primary }}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create room'}
@@ -317,11 +317,11 @@ function VisibilityOption({
         'rounded-xl border p-4 text-left transition-colors',
         focusRing,
         selected
-          ? 'border-[#695CFF] bg-[#695CFF]/10'
+          ? 'border-[var(--brand)] bg-[var(--brand)]/10'
           : 'border-white/10 bg-white/[0.02] hover:border-white/20',
       )}
     >
-      <Icon className={cn('h-4.5 w-4.5', selected ? 'text-[#8B7FFF]' : 'text-white/50')} />
+      <Icon className={cn('h-4.5 w-4.5', selected ? 'text-[var(--brand-soft)]' : 'text-white/50')} />
       <p className="mt-2 text-sm font-medium">{title}</p>
       <p className="mt-0.5 text-xs leading-relaxed text-white/50">{body}</p>
     </button>
@@ -359,7 +359,7 @@ export default function CreateRoomPage() {
     <Suspense
       fallback={
         <div className="flex justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-[#695CFF]" />
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--brand)]" />
         </div>
       }
     >
