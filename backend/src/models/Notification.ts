@@ -46,4 +46,9 @@ const notificationSchema = new Schema<INotification>(
 // Index for efficient querying of unread notifications
 notificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 
-export const Notification = mongoose.model<INotification>('Notification', notificationSchema);
+// Reuse an already-registered model rather than redefining it: Mongoose
+// throws OverwriteModelError on a second registration, which happens
+// whenever the module registry is reset (hot reload, test isolation).
+export const Notification =
+    (mongoose.models.Notification as mongoose.Model<INotification>) ||
+    mongoose.model<INotification>('Notification', notificationSchema);

@@ -6,6 +6,7 @@ import { User } from '../models/User';
 import { Room } from '../models/Room';
 import { AuthRequest } from '../middleware/auth';
 import { emailService } from '../services/emailService';
+import { userChannel } from '../sockets';
 
 // POST /api/friends/request
 export const sendFriendRequest = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -246,15 +247,33 @@ export const inviteToRoom = async (req: AuthRequest, res: Response): Promise<voi
             }
         });
 
-        // Send email
-        await emailService.sendRoomInvite({
-            toEmail: friend.email,
-            toName: friend.fullName || friend.email,
-            fromName: inviter.fullName || inviter.email,
-            movieTitle: (room.movie as any)?.title || 'a movie',
-            roomCode: room.code,
-            roomId: room._id.toString()
-        });
+        // Deliver it live as well. The frontend has always listened for
+        // 'room-invite'; nothing ever emitted it, so an invite only appeared
+        // after a manual refresh or an email round trip.
+        const io = req.app.get('io');
+        if (io) {
+            io.to(userChannel(friendId)).emit('room-invite', {
+                roomId: room._id.toString(),
+                roomName: room.name,
+                fromUserName: inviter.fullName || inviter.email,
+                movieTitle: (room.movie as any)?.title || 'a movie'
+            });
+        }
+
+        // Email is best-effort: a mail outage must not fail the invite, since
+        // the notification and socket delivery have already succeeded.
+        try {
+            await emailService.sendRoomInvite({
+                toEmail: friend.email,
+                toName: friend.fullName || friend.email,
+                fromName: inviter.fullName || inviter.email,
+                movieTitle: (room.movie as any)?.title || 'a movie',
+                roomCode: room.code,
+                roomId: room._id.toString()
+            });
+        } catch (mailError) {
+            console.error('Room invite email failed:', mailError);
+        }
 
         res.status(200).json({ success: true, message: 'Invite sent' });
     } catch (error: any) {

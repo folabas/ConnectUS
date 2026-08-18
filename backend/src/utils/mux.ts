@@ -35,7 +35,8 @@ export const createDirectUpload = async (): Promise<DirectUploadResponse> => {
             cors_origin: '*', // In production, set this to your frontend domain
         });
 
-        console.log('Mux Upload Response:', JSON.stringify(upload, null, 2));
+        // The full upload response contains a signed URL; log only the id.
+        console.log('Mux direct upload created:', upload.id);
 
         return {
             uploadUrl: upload.url,

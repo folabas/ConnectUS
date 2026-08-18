@@ -7,7 +7,7 @@ import { Lock, ArrowLeft, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { authApi } from '@/services/api';
+import { authApi, errorMessage } from '@/lib/api';
 
 function ResetPasswordContent() {
     const searchParams = useSearchParams();
@@ -40,22 +40,16 @@ function ResetPasswordContent() {
         setIsLoading(true);
 
         try {
-            const response = await authApi.resetPassword(token, password);
+            await authApi.resetPassword(token, password);
+            setIsSuccess(true);
+            toast.success('Password reset successfully!');
 
-            if (response.success) {
-                setIsSuccess(true);
-                toast.success('Password reset successfully!');
-
-                // Redirect to login after 2 seconds
-                setTimeout(() => {
-                    router.push('/');
-                }, 2000);
-            } else {
-                toast.error(response.message || 'Failed to reset password');
-            }
-        } catch (error: any) {
-            console.error('Reset password error:', error);
-            toast.error('Invalid or expired reset link');
+            // Send them to sign in once they have read the confirmation.
+            setTimeout(() => {
+                router.push('/auth');
+            }, 2000);
+        } catch (error) {
+            toast.error(errorMessage(error));
         } finally {
             setIsLoading(false);
         }

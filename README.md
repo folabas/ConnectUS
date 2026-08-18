@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ConnectUs
 
-## Getting Started
+Watch films together, in sync, from anywhere. The host drives playback; everyone
+else follows within a fraction of a second, alongside live chat, floating
+reactions, and peer-to-peer video.
 
-First, run the development server:
+## Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind 4 |
+| Backend | Express 5, MongoDB (Mongoose), Socket.io |
+| Realtime | Socket.io for state, WebRTC for video chat |
+| Auth | JWT, bcrypt |
+| Video | Internet Archive (public domain) + optional Mux uploads |
+
+## Running locally
+
+You need Node 20+ and a MongoDB instance (local or Atlas).
+
+**1. Backend**
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd backend && cp env.example .env && npm install && npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Fill in `.env` before starting — the server validates its configuration at boot
+and refuses to run with a missing or placeholder `JWT_SECRET`. Generate one with:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**2. Frontend**
 
-## Learn More
+```bash
+cp env.local.example .env.local && npm install && npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+**3. Seed the starter catalog**
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+With the backend running and a user registered, sign in and call:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+curl -X POST http://localhost:5000/api/movies/seed -H "Authorization: Bearer <your-token>"
+```
 
-## Deploy on Vercel
+This adds the Blender open movies. Everything else comes from the in-app archive
+search on the Library page.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The app is at http://localhost:3000, the API at http://localhost:5000.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Architecture
+
+### Routing
+
+Rooms are addressed by URL, not by session state:
+
+```
+/                       landing (redirects signed-in users to /library)
+/auth                   sign in / sign up / reset       ?next= preserves the destination
+/join/[code]            invite-link entry, resolves a code to a room
+/library                browse and add films            ─┐
+/rooms                  browse public rooms, enter code  │ (app) group:
+/rooms/new              host a room                      │ auth-guarded, shared chrome
+/profile  /settings                                     ─┘
+/room/[roomId]          lobby: participants, invites, approvals
+/room/[roomId]/watch    the session itself
+```
+
+`AuthProvider` resolves the session once on boot; `AuthGuard` waits for that to
+settle before redirecting, so a hard refresh does not bounce a signed-in user to
+`/auth`. `RoomProvider` owns all state for a room subtree.
+
+### Identity on the socket
+
+The client presents its JWT in the connection handshake. The server derives the
+user from that token and ignores any identity a payload claims. `join-room`
+additionally verifies room membership in the database before admitting a socket
+to a room channel, so knowing a room id is not enough to listen in.
+
+Each user also has a private channel (`user:<id>`). It is how the server reaches
+someone who is *not* in a room channel — in particular a person waiting for their
+join request to be approved.
+
+### Playback sync
+
+Payloads carry `emittedAt`, so a follower adds the message's flight time before
+seeking. Applying a remote change suppresses outbound emits for a short window,
+otherwise the element's own `seeking` event would be broadcast straight back and
+the room would oscillate. Drift under 0.75s is left alone — a micro-seek is more
+noticeable than the drift it corrects.
+
+### Video chat and TURN
+
+Peer connections fetch their ICE configuration from `GET /api/webrtc/ice` rather
+than hardcoding it, so TURN credentials can be rotated without a redeploy and are
+never baked into the bundle.
+
+Three providers are supported, in order of precedence:
+
+1. **Cloudflare Realtime** (recommended) — set `CLOUDFLARE_TURN_KEY_ID` and
+   `CLOUDFLARE_TURN_API_TOKEN`. Credentials are minted by Cloudflare's API and
+   cached server-side for half their 24-hour life, so entering a room does not
+   cost a round trip to Cloudflare. 1,000 GB/month free, then $0.05/GB.
+2. **coturn / Twilio shared secret** — `TURN_URLS` + `TURN_SECRET`. The API
+   issues credentials expiring after 12 hours: the username is
+   `<expiry>:<userId>` and the password its HMAC-SHA1 under the secret.
+3. **Static credentials** — `TURN_URLS` + `TURN_USERNAME` + `TURN_PASSWORD`.
+
+If a configured provider is unreachable the API falls back to STUN rather than
+failing the request: an outage should cost relay-dependent users their video,
+not break the room for everyone in it.
+
+Without TURN the app still runs on STUN alone, logs a warning at boot, and tells
+people in the room that connections are direct-only — but expect roughly 10-20%
+of users to fail to share camera and microphone.
+
+### Where the films come from
+
+The library is backed by the Internet Archive's public-domain collections
+(searchable and importable from the Library page) plus the Blender open movies.
+Uploads via Mux are supported but optional.
+
+`docs/VIDEO_SOURCES.md` explains the alternatives and the licensing constraints
+in detail. The short version: no legal API streams licensed Hollywood films, so
+the catalog is public-domain content and whatever users host themselves.
+
+## Testing
+
+```bash
+npm run test:run      # unit and integration (vitest)
+npm run test:e2e      # browser tests (playwright)
+npx tsc --noEmit      # frontend types
+cd backend && npx tsc --noEmit
+```
+
+## Before deploying
+
+See `docs/LAUNCH_CHECKLIST.md`.

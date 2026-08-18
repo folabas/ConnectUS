@@ -1,15 +1,36 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Room } from '../models/Room';
+import { Message } from '../models/Message';
 import { User } from '../models/User';
 import { Movie } from '../models/Movie';
 import { AuthRequest } from '../middleware/auth';
 import crypto from 'crypto';
 import { emailService } from '../services/emailService';
+import { userChannel } from '../sockets';
 
 // Helper to generate random room code
 const generateRoomCode = (): string => {
     return crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
 };
+
+/** Cap on a single email-invite batch, so the endpoint is not a mail relay. */
+const MAX_INVITES_PER_REQUEST = 20;
+
+/** The id of a join request's user, whether or not the ref has been populated. */
+const requestUserId = (user: any): string =>
+    (user?._id ?? user)?.toString();
+
+/** Newest N messages returned as history; older ones stay in the database. */
+const MESSAGE_HISTORY_LIMIT = 200;
+
+/** The populate shape every room response uses. */
+const populateRoom = (id: string) =>
+    Room.findById(id)
+        .populate('host', '_id fullName avatarUrl')
+        .populate('movie')
+        .populate('participants', '_id fullName avatarUrl')
+        .populate('joinRequests.user', '_id fullName avatarUrl');
 
 // POST /api/rooms
 export const createRoom = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -88,7 +109,9 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
         // Only list public rooms that are waiting or playing
         const rooms = await Room.find({
             type: 'public',
-            status: { $in: ['waiting', 'playing'] },
+            // 'scheduled' and 'active' rooms were previously invisible in browse,
+            // so a room scheduled for later could never be discovered.
+            status: { $in: ['waiting', 'scheduled', 'active', 'playing'] },
         })
             .populate('host', 'fullName avatarUrl')
             .populate('movie', 'title image duration')
@@ -156,116 +179,204 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
             return;
         }
 
-        let room;
-
-        if (roomId) {
-            room = await Room.findById(roomId).populate('movie');
-        } else if (code) {
-            room = await Room.findOne({ code: code.toUpperCase() }).populate('movie');
-        }
+        const room = roomId
+            ? await Room.findById(roomId).populate('movie')
+            : code
+                ? await Room.findOne({ code: String(code).toUpperCase() }).populate('movie')
+                : null;
 
         if (!room) {
-            res.status(404).json({
-                success: false,
-                message: 'Room not found',
-            });
+            res.status(404).json({ success: false, message: 'Room not found' });
             return;
         }
 
-        // Check room status - don't allow joining finished rooms
         if (room.status === 'finished') {
-            res.status(400).json({
-                success: false,
-                message: 'This room session has ended',
+            res.status(400).json({ success: false, message: 'This room session has ended' });
+            return;
+        }
+
+        const isHost = room.host.toString() === userId;
+        const isParticipant = room.participants.some((p) => p.toString() === userId);
+        const isApproved = room.joinRequests?.some(
+            (r) => r.user.toString() === userId && r.status === 'approved'
+        );
+
+        // Approval gate. Previously this only applied once the room was already
+        // 'playing', so anyone holding the code could walk straight into a
+        // waiting private room and bypass the host entirely.
+        if (room.approvalRequired && !isHost && !isParticipant && !isApproved) {
+            res.status(200).json({
+                success: true,
+                requiresApproval: true,
+                message: 'The host needs to approve your request to join.',
+                data: await populateRoom(room._id.toString()),
             });
             return;
         }
 
-        // Check if approval is required (Only if room is already playing)
-        if (room.status === 'playing' && room.approvalRequired && room.host.toString() !== userId) {
-            const isParticipant = room.participants.some((p) => p.toString() === userId);
-            const isApproved = room.joinRequests?.some((r) => r.user.toString() === userId && r.status === 'approved');
-
-            if (!isParticipant && !isApproved) {
-                // Return room data but with status indicating they are not a participant yet
-                // They can enter the waiting room as a visitor to "Ask to Join"
-                res.status(200).json({
-                    success: true,
-                    requiresApproval: true,
-                    message: 'Host approval is required to join this session in progress.',
-                    data: room
-                });
-                return;
-            }
+        // Private rooms reached by id rather than by code require prior admission.
+        if (room.type === 'private' && !code && !isHost && !isParticipant && !isApproved) {
+            res.status(403).json({
+                success: false,
+                message: 'This is a private room. Use an invite link or room code.',
+            });
+            return;
         }
 
-        // For private rooms joined via roomId (not code), check if user is already a participant or was previously approved
-        if (room.type === 'private' && !code) {
-            const isParticipant = room.participants.some((p) => p.toString() === userId);
-            const isApproved = room.joinRequests?.some((r) => r.user.toString() === userId && r.status === 'approved');
-
-            if (!isParticipant && !isApproved && room.host.toString() !== userId) {
-                res.status(403).json({
-                    success: false,
-                    message: 'This is a private room. Please use an invite link or room code.',
-                });
-                return;
-            }
+        if (!isParticipant && !isHost && room.participants.length >= room.maxParticipants) {
+            res.status(400).json({ success: false, message: 'Room is full' });
+            return;
         }
 
-        // Check if room is full
-        if (room.participants.length >= room.maxParticipants) {
-            // Check if user is already in the room
-            const isParticipant = room.participants.some((p) => p.toString() === userId);
-            if (!isParticipant) {
-                res.status(400).json({
-                    success: false,
-                    message: 'Room is full',
-                });
-                return;
-            }
-        }
-
-        // Add user to participants if not already there
-        const isParticipant = room.participants.some((p) => p.toString() === userId);
         if (!isParticipant) {
-            room.participants.push(userId as any);
-            await room.save();
+            await Room.updateOne(
+                { _id: room._id },
+                { $addToSet: { participants: new mongoose.Types.ObjectId(userId) } }
+            );
 
-            // Update user stats
-            const movieTitle = (room.movie as any)?.title || 'Unknown Movie';
-            const movieId = (room.movie as any)?._id || room.movie;
-
-            await User.findByIdAndUpdate(userId, {
-                $inc: { moviesWatched: 1 },
-                $push: {
-                    watchHistory: {
-                        movieId: movieId,
-                        title: movieTitle,
-                        date: new Date(),
-                        rating: 0 // Default rating
-                    }
-                }
+            // Count the watch once per user per room. A socket disconnect pulls
+            // the user out of `participants`, so without this guard every
+            // refresh re-incremented moviesWatched and appended a duplicate
+            // watch-history entry.
+            const alreadyCounted = await User.exists({
+                _id: userId,
+                'watchHistory.roomId': room._id,
             });
 
-            // Repopulate room to return full participant details
-            room = await Room.findById(room._id)
-                .populate('movie')
-                .populate('participants', '_id fullName avatarUrl')
-                .populate('host', '_id fullName avatarUrl');
+            if (!alreadyCounted && !isHost) {
+                const movie = room.movie as any;
+                await User.findByIdAndUpdate(userId, {
+                    $inc: { moviesWatched: 1 },
+                    $push: {
+                        watchHistory: {
+                            movieId: movie?._id ?? room.movie,
+                            roomId: room._id,
+                            title: movie?.title ?? 'Unknown Movie',
+                            date: new Date(),
+                            rating: 0,
+                        },
+                    },
+                });
+            }
         }
 
         res.status(200).json({
             success: true,
-            data: room,
+            requiresApproval: false,
+            data: await populateRoom(room._id.toString()),
         });
     } catch (error: any) {
         console.error('Join room error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-            error: error.message,
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// POST /api/rooms/:id/leave
+export const leaveRoom = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const room = await Room.findById(id);
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // The host leaving would orphan the room; they end it instead.
+        if (room.host.toString() === userId) {
+            res.status(400).json({
+                success: false,
+                message: 'As host, end the session instead of leaving it.',
+            });
+            return;
+        }
+
+        await Room.updateOne(
+            { _id: id },
+            {
+                $pull: { participants: new mongoose.Types.ObjectId(userId) },
+                $set: { 'joinRequests.$[elem].status': 'left' },
+            },
+            {
+                arrayFilters: [
+                    {
+                        'elem.user': new mongoose.Types.ObjectId(userId),
+                        'elem.status': 'approved',
+                    },
+                ],
+            }
+        );
+
+        const updated = await populateRoom(id);
+        const io = req.app.get('io');
+        if (io && updated) {
+            io.to(id).emit('room-updated', {
+                roomId: id,
+                participantCount: updated.participants.length,
+                participants: updated.participants,
+                host: updated.host,
+                movie: updated.movie,
+                status: updated.status,
+            });
+        }
+
+        res.status(200).json({ success: true, message: 'Left the room' });
+    } catch (error: any) {
+        console.error('Leave room error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// GET /api/rooms/:id/messages
+export const getRoomMessages = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const userId = req.user?.userId;
+
+        const room = await Room.findById(id).select('host participants joinRequests');
+        if (!room) {
+            res.status(404).json({ success: false, message: 'Room not found' });
+            return;
+        }
+
+        // History is only readable by people who were actually in the room.
+        const allowed =
+            room.host.toString() === userId ||
+            room.participants.some((p) => p.toString() === userId) ||
+            room.joinRequests?.some(
+                (r) => r.user.toString() === userId && ['approved', 'left'].includes(r.status)
+            );
+
+        if (!allowed) {
+            res.status(403).json({ success: false, message: 'You are not in this room' });
+            return;
+        }
+
+        const messages = await Message.find({ room: id })
+            .sort({ createdAt: 1 })
+            .limit(MESSAGE_HISTORY_LIMIT)
+            .lean();
+
+        res.status(200).json({
+            success: true,
+            data: messages.map((message) => ({
+                id: message._id.toString(),
+                roomId: id,
+                userId: message.user.toString(),
+                userName: message.userName,
+                text: message.text,
+                timestamp: message.createdAt.toISOString(),
+            })),
         });
+    } catch (error: any) {
+        console.error('Get messages error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
 
@@ -299,20 +410,42 @@ export const inviteToRoom = async (req: AuthRequest, res: Response): Promise<voi
         const movie = await Movie.findById(room.movie);
         const movieTitle = movie?.title || 'a movie';
 
-        for (const email of emails) {
-            await emailService.sendRoomInvite({
-                toEmail: email,
-                toName: email.split('@')[0], // Use email username as name
-                fromName: inviterName,
-                movieTitle: movieTitle,
-                roomCode: room.code,
-                roomId: room._id.toString()
+        const recipients = (Array.isArray(emails) ? emails : [])
+            .map((email: unknown) => String(email).trim())
+            .filter((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+            .slice(0, MAX_INVITES_PER_REQUEST);
+
+        if (recipients.length === 0) {
+            res.status(400).json({ success: false, message: 'No valid email addresses provided' });
+            return;
+        }
+
+        // One bad address should not fail the whole batch.
+        const results = await Promise.allSettled(
+            recipients.map((email: string) =>
+                emailService.sendRoomInvite({
+                    toEmail: email,
+                    toName: email.split('@')[0],
+                    fromName: inviterName,
+                    movieTitle,
+                    roomCode: room.code,
+                    roomId: room._id.toString()
+                })
+            )
+        );
+
+        const sent = results.filter((result) => result.status === 'fulfilled').length;
+        if (sent === 0) {
+            res.status(502).json({
+                success: false,
+                message: 'Invitations could not be sent. Check the email configuration.'
             });
+            return;
         }
 
         res.status(200).json({
             success: true,
-            message: `Invitations sent to ${emails.length} email(s)`
+            message: `Invitations sent to ${sent} recipient(s)`
         });
     } catch (error: any) {
         console.error('Invite error:', error);
@@ -408,32 +541,39 @@ export const requestToJoin = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        // Check if user was previously rejected
-        const rejectedRequest = room.joinRequests?.find(
-            r => r.user.toString() === userId && r.status === 'rejected'
-        );
-        if (rejectedRequest) {
-            res.status(403).json({ success: false, message: 'Your join request was rejected' });
-            return;
-        }
-
-        // Add join request
+        // A previous rejection no longer bars a fresh attempt: the old code left
+        // the user permanently locked out with no way for the host to relent.
+        // The stale entry is dropped so the new request is the only pending one.
         if (!room.joinRequests) {
             room.joinRequests = [];
         }
+        room.joinRequests = room.joinRequests.filter(
+            r => r.user.toString() !== userId
+        ) as typeof room.joinRequests;
+
+        const requestedAt = new Date();
         room.joinRequests.push({
             user: userId as any,
-            requestedAt: new Date(),
+            requestedAt,
             status: 'pending'
         });
         await room.save();
 
-        // Notify host via socket
+        const requester = await User.findById(userId).select('_id fullName avatarUrl');
+
+        // Addressed to the host's own channel rather than the room channel. The
+        // host may not have a socket in the room yet, and broadcasting a join
+        // request to every participant leaked who was knocking.
         const io = req.app.get('io');
         if (io) {
-            io.to(id).emit('join-request-received', {
+            io.to(userChannel(room.host.toString())).emit('join-request-received', {
                 roomId: id,
-                userId
+                user: {
+                    _id: userId,
+                    fullName: requester?.fullName,
+                    avatarUrl: requester?.avatarUrl
+                },
+                requestedAt: requestedAt.toISOString()
             });
         }
 
@@ -455,7 +595,11 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
             return;
         }
 
-        const room = await Room.findById(id).populate('joinRequests.user', 'fullName avatarUrl');
+        // Deliberately NOT populating joinRequests.user here: populate replaces
+        // the ObjectId with a document, and the lookup below compares against a
+        // raw id string. With populate the comparison never matched, so every
+        // approval and rejection returned 'Join request not found'.
+        const room = await Room.findById(id);
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
@@ -474,7 +618,9 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
         }
 
         // Find the request
-        const request = room.joinRequests?.find(r => r.user.toString() === userId && r.status === 'pending');
+        const request = room.joinRequests?.find(
+            r => requestUserId(r.user) === userId && r.status === 'pending'
+        );
         if (!request) {
             res.status(404).json({ success: false, message: 'Join request not found' });
             return;
@@ -482,10 +628,14 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
 
         // Update request status
         request.status = 'approved';
-
-        // Add user to participants
-        room.participants.push(userId as any);
         await room.save();
+
+        // $addToSet rather than push: the socket join handler also adds the user,
+        // and two concurrent writes with push produced duplicate participants.
+        await Room.updateOne(
+            { _id: id },
+            { $addToSet: { participants: new mongoose.Types.ObjectId(userId) } }
+        );
 
         // Re-populate to get full details
         const updatedRoom = await Room.findById(id)
@@ -494,15 +644,16 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
             .populate('participants', '_id fullName avatarUrl')
             .populate('joinRequests.user', '_id fullName avatarUrl');
 
-        // Notify the user who requested to join via socket
         const io = req.app.get('io');
         if (io) {
-            io.to(id).emit('join-request-approved', {
+            // To the requester's own channel: a pending user is deliberately not
+            // in the room channel, so the previous room-scoped emit reached
+            // everyone except the one person waiting for the answer.
+            io.to(userChannel(userId)).emit('join-request-approved', {
                 roomId: id,
-                userId,
                 room: updatedRoom
             });
-            // Also notify all participants about the new participant
+            // And tell the room it has a new participant.
             io.to(id).emit('room-updated', {
                 roomId: id,
                 participantCount: updatedRoom!.participants.length,
@@ -531,7 +682,11 @@ export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promis
             return;
         }
 
-        const room = await Room.findById(id).populate('joinRequests.user', 'fullName avatarUrl');
+        // Deliberately NOT populating joinRequests.user here: populate replaces
+        // the ObjectId with a document, and the lookup below compares against a
+        // raw id string. With populate the comparison never matched, so every
+        // approval and rejection returned 'Join request not found'.
+        const room = await Room.findById(id);
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
@@ -544,7 +699,9 @@ export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promis
         }
 
         // Find the request
-        const request = room.joinRequests?.find(r => r.user.toString() === userId && r.status === 'pending');
+        const request = room.joinRequests?.find(
+            r => requestUserId(r.user) === userId && r.status === 'pending'
+        );
         if (!request) {
             res.status(404).json({ success: false, message: 'Join request not found' });
             return;
@@ -554,12 +711,12 @@ export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promis
         request.status = 'rejected';
         await room.save();
 
-        // Notify the user whose request was rejected via socket
+        // Same reasoning as approval: the requester is not in the room channel.
         const io = req.app.get('io');
         if (io) {
-            io.to(id).emit('join-request-rejected', {
+            io.to(userChannel(userId)).emit('join-request-rejected', {
                 roomId: id,
-                userId
+                message: 'The host declined your request to join.'
             });
         }
 

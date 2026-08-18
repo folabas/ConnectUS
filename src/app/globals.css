@@ -241,3 +241,30 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* ---------------------------------------------------------------------------
+   Landing page motion
+
+   The playhead runs as a compositor-driven keyframe rather than React state, so
+   the hero costs nothing per frame. Every animation on the marketing page is
+   transform/opacity only.
+   --------------------------------------------------------------------------- */
+
+@keyframes playhead {
+  0%   { transform: scaleX(0.12); }
+  55%  { transform: scaleX(0.62); }
+  100% { transform: scaleX(0.12); }
+}
+
+/* Respect the OS preference globally: any decorative animation that slipped
+   through stops here, and scroll-behaviour returns to instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

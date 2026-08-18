@@ -34,4 +34,9 @@ const friendSchema = new Schema<IFriend>(
 // Compound index to prevent duplicate friend requests
 friendSchema.index({ requester: 1, recipient: 1 }, { unique: true });
 
-export const Friend = mongoose.model<IFriend>('Friend', friendSchema);
+// Reuse an already-registered model rather than redefining it: Mongoose
+// throws OverwriteModelError on a second registration, which happens
+// whenever the module registry is reset (hot reload, test isolation).
+export const Friend =
+    (mongoose.models.Friend as mongoose.Model<IFriend>) ||
+    mongoose.model<IFriend>('Friend', friendSchema);

@@ -1,0 +1,124 @@
+import crypto from 'crypto';
+import { Response } from 'express';
+import { AuthRequest } from '../middleware/auth';
+import { env } from '../config/env';
+import {
+    getCloudflareIceServers,
+    isCloudflareTurnConfigured,
+} from '../services/cloudflareTurn';
+
+/**
+ * ICE configuration for peer connections.
+ *
+ * The client used to hardcode two public STUN servers and nothing else. STUN
+ * alone fails for peers behind symmetric NAT — commonly cited at roughly 10-20%
+ * of users, and higher on corporate and some mobile networks. Those users see
+ * everyone else's video and none of their own reaches anyone.
+ *
+ * TURN credentials are served from here rather than shipped in the bundle, for
+ * two reasons: they can be rotated without a redeploy, and the time-limited
+ * form below cannot be scraped from static JavaScript and reused indefinitely.
+ */
+
+/** How long an issued TURN credential remains valid. */
+const CREDENTIAL_TTL_SECONDS = 12 * 60 * 60;
+
+interface IceServer {
+    urls: string | string[];
+    username?: string;
+    credential?: string;
+}
+
+/**
+ * The coturn / Twilio "REST API" credential scheme: the username is an expiry
+ * timestamp, and the password is an HMAC-SHA1 of it under a shared secret. The
+ * TURN server validates without any per-user state.
+ */
+function timeLimitedCredential(secret: string, userId: string) {
+    const expiry = Math.floor(Date.now() / 1000) + CREDENTIAL_TTL_SECONDS;
+    const username = `${expiry}:${userId}`;
+    const credential = crypto
+        .createHmac('sha1', secret)
+        .update(username)
+        .digest('base64');
+    return { username, credential, expiry };
+}
+
+/**
+ * Whether a usable relay is present in an ICE list.
+ *
+ * Deliberately not `iceServers.length > 1`. Providers disagree about shape:
+ * some return a separate STUN entry followed by a TURN entry, others return a
+ * single entry whose `urls` array mixes stun:, turn: and turns: together with
+ * one credential pair. Cloudflare returns the combined form, so counting
+ * entries reported "no relay" while the relay was working — and the watch
+ * screen told everyone their connections were direct-only.
+ *
+ * A relay is present when some entry carries a turn: or turns: url. Credentials
+ * are required too: a TURN url with no credential is unusable, and the browser
+ * wastes candidate-gathering time retrying it.
+ */
+export function hasUsableRelay(iceServers: IceServer[]): boolean {
+    return iceServers.some((server) => {
+        const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+        const isRelay = urls.some((url) => /^turns?:/i.test(url));
+        return isRelay && Boolean(server.username && server.credential);
+    });
+}
+
+export async function buildIceServers(
+    userId: string,
+): Promise<{ iceServers: IceServer[]; ttl: number }> {
+    // Cloudflare supplies its own STUN alongside TURN, so when it answers we use
+    // its list wholesale rather than mixing in unrelated public STUN servers.
+    if (isCloudflareTurnConfigured()) {
+        const cloudflare = await getCloudflareIceServers();
+        if (cloudflare?.length) {
+            return { iceServers: cloudflare, ttl: CREDENTIAL_TTL_SECONDS };
+        }
+        // Fall through to STUN below: a Cloudflare outage should degrade video
+        // for relay-dependent users, not break the room for everyone.
+    }
+
+    const iceServers: IceServer[] = [
+        { urls: env.stunUrls },
+    ];
+
+    if (env.turnUrls.length > 0) {
+        if (env.TURN_SECRET) {
+            const { username, credential } = timeLimitedCredential(env.TURN_SECRET, userId);
+            iceServers.push({ urls: env.turnUrls, username, credential });
+        } else if (env.TURN_USERNAME && env.TURN_PASSWORD) {
+            // Static credentials: simpler to set up, but they live as long as you
+            // leave them in the environment.
+            iceServers.push({
+                urls: env.turnUrls,
+                username: env.TURN_USERNAME,
+                credential: env.TURN_PASSWORD,
+            });
+        }
+    }
+
+    return { iceServers, ttl: CREDENTIAL_TTL_SECONDS };
+}
+
+// GET /api/webrtc/ice
+export const getIceServers = async (req: AuthRequest, res: Response): Promise<void> => {
+    const userId = req.user?.userId;
+    if (!userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+    }
+
+    const { iceServers, ttl } = await buildIceServers(userId);
+
+    res.status(200).json({
+        success: true,
+        data: {
+            iceServers,
+            ttl,
+            // Lets the client warn that relay-only peers will fail.
+            turnConfigured: hasUsableRelay(iceServers),
+        },
+    });
+};
