@@ -35,7 +35,7 @@ they block a launch.
 - [x] Frontend and backend typecheck clean; `next build` succeeds.
 - [x] `npm run lint` clean.
 - [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
-- [x] 60 backend tests pass (`cd backend && npm test`): socket handshake auth,
+- [x] 66 backend tests pass (`cd backend && npm test`): socket handshake auth,
       room membership enforcement, chat delivery/ordering/limits/persistence,
       playback authority, the approval flow including the populate and race
       regressions, watch-stat idempotency, and seed safety.

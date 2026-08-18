@@ -24,6 +24,27 @@ const cloudflareResponse = {
     ],
 };
 
+/**
+ * The other shape Cloudflare returns: one entry whose urls array mixes stun,
+ * turn and turns, sharing a single credential pair. This is what the dashboard
+ * and the credentials guide actually show, and counting array entries to detect
+ * a relay reported "none" for it.
+ */
+const combinedResponse = {
+    iceServers: [
+        {
+            urls: [
+                'stun:stun.cloudflare.com:3478',
+                'turn:turn.cloudflare.com:3478?transport=udp',
+                'turn:turn.cloudflare.com:3478?transport=tcp',
+                'turns:turn.cloudflare.com:5349?transport=tcp',
+            ],
+            username: 'xxxx',
+            credential: 'yyyy',
+        },
+    ],
+};
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function respond(payload: unknown, status = 201) {
@@ -163,6 +184,31 @@ describe('buildIceServers with Cloudflare', () => {
         expect(JSON.stringify(iceServers)).not.toContain('google.com');
     });
 
+    it('reports a relay for the single combined entry Cloudflare returns', async () => {
+        // Regression: turnConfigured was `iceServers.length > 1`, so this shape
+        // reported no relay while the relay was working, and the watch screen
+        // told everyone connections were direct-only.
+        fetchMock.mockImplementation(() => respond(combinedResponse));
+        const { buildIceServers, hasUsableRelay } = await import(
+            '../src/controllers/webrtcController'
+        );
+
+        const { iceServers } = await buildIceServers('user-1');
+
+        expect(iceServers).toHaveLength(1);
+        expect(hasUsableRelay(iceServers)).toBe(true);
+    });
+
+    it('reports a relay for the split two-entry shape as well', async () => {
+        fetchMock.mockImplementation(() => respond(cloudflareResponse));
+        const { buildIceServers, hasUsableRelay } = await import(
+            '../src/controllers/webrtcController'
+        );
+
+        const { iceServers } = await buildIceServers('user-1');
+        expect(hasUsableRelay(iceServers)).toBe(true);
+    });
+
     it('falls back to STUN when Cloudflare is unreachable', async () => {
         // A Cloudflare outage should cost relay-dependent users their video, not
         // break the room for everyone in it.
@@ -173,5 +219,33 @@ describe('buildIceServers with Cloudflare', () => {
 
         expect(iceServers).toHaveLength(1);
         expect(JSON.stringify(iceServers)).toContain('stun:');
+    });
+});
+
+describe('hasUsableRelay', () => {
+    it('is false for STUN alone', async () => {
+        const { hasUsableRelay } = await import('../src/controllers/webrtcController');
+        expect(hasUsableRelay([{ urls: ['stun:stun.example:3478'] }])).toBe(false);
+    });
+
+    it('is false for a turn url with no credentials', async () => {
+        // Worse than no entry: the browser retries it and stalls candidate
+        // gathering for everyone.
+        const { hasUsableRelay } = await import('../src/controllers/webrtcController');
+        expect(hasUsableRelay([{ urls: ['turn:turn.example:3478'] }])).toBe(false);
+    });
+
+    it('accepts a single urls string rather than an array', async () => {
+        const { hasUsableRelay } = await import('../src/controllers/webrtcController');
+        expect(
+            hasUsableRelay([
+                { urls: 'turns:turn.example:5349', username: 'u', credential: 'c' },
+            ]),
+        ).toBe(true);
+    });
+
+    it('is false for an empty list', async () => {
+        const { hasUsableRelay } = await import('../src/controllers/webrtcController');
+        expect(hasUsableRelay([])).toBe(false);
     });
 });

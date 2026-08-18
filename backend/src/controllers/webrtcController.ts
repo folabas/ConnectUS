@@ -44,6 +44,28 @@ function timeLimitedCredential(secret: string, userId: string) {
     return { username, credential, expiry };
 }
 
+/**
+ * Whether a usable relay is present in an ICE list.
+ *
+ * Deliberately not `iceServers.length > 1`. Providers disagree about shape:
+ * some return a separate STUN entry followed by a TURN entry, others return a
+ * single entry whose `urls` array mixes stun:, turn: and turns: together with
+ * one credential pair. Cloudflare returns the combined form, so counting
+ * entries reported "no relay" while the relay was working — and the watch
+ * screen told everyone their connections were direct-only.
+ *
+ * A relay is present when some entry carries a turn: or turns: url. Credentials
+ * are required too: a TURN url with no credential is unusable, and the browser
+ * wastes candidate-gathering time retrying it.
+ */
+export function hasUsableRelay(iceServers: IceServer[]): boolean {
+    return iceServers.some((server) => {
+        const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+        const isRelay = urls.some((url) => /^turns?:/i.test(url));
+        return isRelay && Boolean(server.username && server.credential);
+    });
+}
+
 export async function buildIceServers(
     userId: string,
 ): Promise<{ iceServers: IceServer[]; ttl: number }> {
@@ -96,7 +118,7 @@ export const getIceServers = async (req: AuthRequest, res: Response): Promise<vo
             iceServers,
             ttl,
             // Lets the client warn that relay-only peers will fail.
-            turnConfigured: iceServers.length > 1,
+            turnConfigured: hasUsableRelay(iceServers),
         },
     });
 };
