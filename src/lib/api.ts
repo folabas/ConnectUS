@@ -398,6 +398,9 @@ export const roomApi = {
     request<void>('/api/rooms/invite', { method: 'POST', body: { roomId, emails } }),
 
   messages: (roomId: string) => request<import('@/types').ChatMessage[]>(`/api/rooms/${roomId}/messages`),
+
+  /** Past sessions this user attended or hosted, newest first. */
+  history: () => request<import('@/types').WatchHistoryEntry[]>('/api/rooms/history'),
 };
 
 /* -------------------------------------------------------------------------- */

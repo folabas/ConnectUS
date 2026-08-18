@@ -14,6 +14,9 @@ const generateRoomCode = (): string => {
     return crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 chars
 };
 
+/** How many past sessions the history endpoint returns. */
+const HISTORY_LIMIT = 50;
+
 /** Cap on a single email-invite batch, so the endpoint is not a mail relay. */
 const MAX_INVITES_PER_REQUEST = 20;
 
@@ -83,6 +86,7 @@ export const createRoom = async (req: AuthRequest, res: Response): Promise<void>
             adminEnabled,
             approvalRequired: approvalRequired ?? (type === 'private'), // Default to true for private rooms
             participants: [userId as any], // Host is automatically a participant
+            attendees: [userId as any],
             status: roomStatus,
         });
 
@@ -141,10 +145,10 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 // GET /api/rooms/:id
 export const getRoomById = async (req: Request, res: Response): Promise<void> => {
     try {
-        const room = await Room.findById(req.params.id)
-            .populate('host', '_id fullName avatarUrl')
-            .populate('movie')
-            .populate('participants', '_id fullName avatarUrl');
+        // Uses the shared populate so joinRequests.user comes back hydrated.
+        // Without it the host's pending-request panel had only an ObjectId to
+        // render and showed everyone as "Guest".
+        const room = await populateRoom(req.params.id);
 
         if (!room) {
             res.status(404).json({
@@ -231,7 +235,13 @@ export const joinRoom = async (req: AuthRequest, res: Response): Promise<void> =
         if (!isParticipant) {
             await Room.updateOne(
                 { _id: room._id },
-                { $addToSet: { participants: new mongoose.Types.ObjectId(userId) } }
+                {
+                    $addToSet: {
+                        participants: new mongoose.Types.ObjectId(userId),
+                        // Append-only: this is what history is built from.
+                        attendees: new mongoose.Types.ObjectId(userId),
+                    },
+                }
             );
 
             // Count the watch once per user per room. A socket disconnect pulls
@@ -376,6 +386,70 @@ export const getRoomMessages = async (req: AuthRequest, res: Response): Promise<
         });
     } catch (error: any) {
         console.error('Get messages error:', error);
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+};
+
+// GET /api/rooms/history
+export const getRoomHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            res.status(401).json({ success: false, message: 'Unauthorized' });
+            return;
+        }
+
+        const objectId = new mongoose.Types.ObjectId(userId);
+
+        // `attendees` is append-only, so it survives everyone leaving. Rooms
+        // created before that field existed are matched on the live roster and
+        // on host, which is the best that can be reconstructed for them.
+        const rooms = await Room.find({
+            $or: [
+                { attendees: objectId },
+                { participants: objectId },
+                { host: objectId },
+            ],
+        })
+            .populate('movie', 'title image duration genre year source videoUrl')
+            .populate('host', '_id fullName avatarUrl')
+            .populate('attendees', '_id fullName avatarUrl')
+            .populate('participants', '_id fullName avatarUrl')
+            .sort({ updatedAt: -1 })
+            .limit(HISTORY_LIMIT)
+            .lean();
+
+        const data = rooms.map((room: any) => {
+            // Prefer the permanent record; fall back for pre-existing rooms.
+            const everyone = (room.attendees?.length ? room.attendees : room.participants) ?? [];
+            const hostId = room.host?._id?.toString();
+
+            return {
+                roomId: room._id.toString(),
+                name: room.name,
+                status: room.status,
+                type: room.type,
+                theme: room.theme,
+                watchedAt: room.updatedAt,
+                createdAt: room.createdAt,
+                movie: room.movie ?? null,
+                host: room.host ?? null,
+                youHosted: hostId === userId,
+                // "With who": everyone who was ever in the room, minus you.
+                companions: everyone
+                    .filter((person: any) => person?._id?.toString() !== userId)
+                    .map((person: any) => ({
+                        _id: person._id.toString(),
+                        fullName: person.fullName,
+                        avatarUrl: person.avatarUrl,
+                        isHost: person._id.toString() === hostId,
+                    })),
+            };
+        });
+
+        res.status(200).json({ success: true, count: data.length, data });
+    } catch (error: any) {
+        console.error('Room history error:', error);
         res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }
 };
@@ -634,7 +708,12 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
         // and two concurrent writes with push produced duplicate participants.
         await Room.updateOne(
             { _id: id },
-            { $addToSet: { participants: new mongoose.Types.ObjectId(userId) } }
+            {
+                $addToSet: {
+                    participants: new mongoose.Types.ObjectId(userId),
+                    attendees: new mongoose.Types.ObjectId(userId),
+                },
+            }
         );
 
         // Re-populate to get full details

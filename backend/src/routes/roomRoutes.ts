@@ -6,6 +6,7 @@ import {
     joinRoom,
     leaveRoom,
     getRoomMessages,
+    getRoomHistory,
     inviteToRoom,
     startRoom,
     requestToJoin,
@@ -22,6 +23,8 @@ router.use(authMiddleware);
 
 router.post('/', writeLimiter, createRoom);
 router.get('/', getRooms);
+// Declared before '/:id' so the literal path is not treated as a room id.
+router.get('/history', getRoomHistory);
 
 // `/join` and `/invite` are declared before `/:id` so they are not swallowed by
 // the parameterised route.

@@ -82,6 +82,22 @@ export interface Room {
   createdAt?: string;
 }
 
+/** One past session, as returned by the history endpoint. */
+export interface WatchHistoryEntry {
+  roomId: string;
+  name: string;
+  status: RoomStatus;
+  type: RoomType;
+  theme: RoomTheme;
+  watchedAt: string;
+  createdAt: string;
+  movie: Movie | null;
+  host: RoomMember | null;
+  youHosted: boolean;
+  /** Everyone else who was in the room. */
+  companions: Array<RoomMember & { isHost: boolean }>;
+}
+
 export interface ChatMessage {
   id: string;
   roomId: string;

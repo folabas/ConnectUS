@@ -12,33 +12,21 @@ import {
   LogOut,
   Play,
   Users,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { InviteFriends } from '@/components/room/InviteFriends';
+import { PendingRequests } from '@/components/room/PendingRequests';
 import { useRoom } from '@/providers/RoomProvider';
 import { useAuth } from '@/providers/AuthProvider';
-import { cn, focusRing, formatRelative, initials, surface } from '@/lib/ui';
+import { cn, focusRing, initials, surface } from '@/lib/ui';
 
 export default function RoomLobbyPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const {
-    room,
-    phase,
-    error,
-    isHost,
-    pendingRequests,
-    requestToJoin,
-    approve,
-    reject,
-    start,
-    end,
-    leave,
-  } = useRoom();
+  const { room, phase, error, isHost, requestToJoin, start, end, leave } = useRoom();
 
   const [starting, setStarting] = useState(false);
 
@@ -215,54 +203,10 @@ export default function RoomLobbyPage() {
               </ul>
             </section>
 
-            {/* Join requests — host only */}
-            {isHost && pendingRequests.length > 0 && (
-              <section className={cn(surface, 'p-6')}>
-                <h2 className="text-lg tracking-tight">
-                  Waiting to be let in ({pendingRequests.length})
-                </h2>
-                <ul className="mt-4 space-y-3">
-                  {pendingRequests.map((request) => (
-                    <li
-                      key={request.user._id}
-                      className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.02] p-3"
-                    >
-                      <Avatar className="h-9 w-9 border border-white/15">
-                        <AvatarImage src={request.user.avatarUrl} alt="" />
-                        <AvatarFallback className="bg-[var(--brand)] text-[var(--brand-ink)] text-sm text-white">
-                          {initials(request.user.fullName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm">{request.user.fullName ?? 'Guest'}</p>
-                        <p className="text-xs text-white/40">
-                          asked {formatRelative(request.requestedAt)}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => void approve(request.user._id)}
-                          className="h-9 rounded-lg bg-emerald-600 hover:bg-emerald-500"
-                          aria-label={`Approve ${request.user.fullName ?? 'guest'}`}
-                        >
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void reject(request.user._id)}
-                          className="h-9 rounded-lg border-white/15 bg-transparent text-white hover:bg-white/5"
-                          aria-label={`Decline ${request.user.fullName ?? 'guest'}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            {/* Join requests — host only. Same component the watch
+                screen uses, so a request looks the same wherever it is seen. */}
+            {isHost && <PendingRequests />}
+
           </div>
 
           {/* Sidebar */}

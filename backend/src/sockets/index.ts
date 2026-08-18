@@ -152,7 +152,7 @@ export function registerSocketHandlers(io: Server) {
 
                 const updated = await Room.findByIdAndUpdate(
                     roomId,
-                    { $addToSet: { participants: userId } },
+                    { $addToSet: { participants: userId, attendees: userId } },
                     { new: true },
                 ).populate(ROOM_POPULATE as never);
 

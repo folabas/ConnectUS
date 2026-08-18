@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FriendsPanel } from '@/components/social/FriendsPanel';
+import { WatchHistory } from '@/components/social/WatchHistory';
 import { authApi, errorMessage } from '@/lib/api';
 import { useAuth } from '@/providers/AuthProvider';
 import { cn, field, initials, surface } from '@/lib/ui';
@@ -154,6 +155,8 @@ export default function ProfilePage() {
           value={user?.moviesWatched ?? 0}
         />
       </div>
+
+      <WatchHistory />
 
       <FriendsPanel />
     </div>

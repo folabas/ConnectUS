@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RoomChat } from '@/components/room/RoomChat';
+import { RoomCodeBadge } from '@/components/room/RoomCodeBadge';
+import { PendingRequests } from '@/components/room/PendingRequests';
 import { ParticipantStrip } from '@/components/room/ParticipantStrip';
 import { ReactionBar, ReactionOverlay } from '@/components/room/Reactions';
 import { useRoom } from '@/providers/RoomProvider';
@@ -122,6 +124,10 @@ export default function WatchPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Kept visible during the session: the moment someone texts asking to
+              be let in is exactly when the host needs this. */}
+          <RoomCodeBadge code={room.code} roomId={room._id} />
+
           <span className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/60 sm:flex">
             <Users className="h-3 w-3" />
             {room.participants.length}
@@ -173,6 +179,13 @@ export default function WatchPage() {
             )}
 
             <ReactionOverlay roomId={room._id} />
+
+            {/* Host only, and it stays until they decide. */}
+            {isHost && (
+              <div className="absolute right-4 top-4 z-30 w-72 max-w-[calc(100%-2rem)]">
+                <PendingRequests variant="floating" />
+              </div>
+            )}
 
             {/* Followers cannot scrub; make that explicit rather than silently
                 swallowing their clicks. */}

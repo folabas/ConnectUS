@@ -17,6 +17,14 @@ export interface IRoom extends Document {
     maxParticipants: number;
     adminEnabled: boolean;
     participants: mongoose.Types.ObjectId[];
+    /**
+     * Everyone who was ever admitted, in order of first arrival.
+     *
+     * `participants` is a live roster — it is pulled from on leave and on
+     * disconnect — so once a session ends it says nothing about who was there.
+     * This is append-only, and is what watch history is built from.
+     */
+    attendees: mongoose.Types.ObjectId[];
     joinRequests: {
         user: mongoose.Types.ObjectId;
         requestedAt: Date;
@@ -83,6 +91,13 @@ const roomSchema = new Schema<IRoom>(
             {
                 type: Schema.Types.ObjectId,
                 ref: 'User',
+            },
+        ],
+        attendees: [
+            {
+                type: Schema.Types.ObjectId,
+                ref: 'User',
+                index: true,
             },
         ],
         joinRequests: [
