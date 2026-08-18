@@ -11,6 +11,8 @@ export interface IUser extends Document {
     hoursWatched: number;
     watchHistory: {
         movieId: mongoose.Types.ObjectId;
+        /** Which session this watch belongs to; makes the entry idempotent. */
+        roomId?: mongoose.Types.ObjectId;
         title: string;
         date: Date;
         rating: number;
@@ -60,6 +62,7 @@ const userSchema = new Schema<IUser>(
         },
         watchHistory: [{
             movieId: { type: Schema.Types.ObjectId, ref: 'Movie' },
+            roomId: { type: Schema.Types.ObjectId, ref: 'Room', index: true },
             title: String,
             date: { type: Date, default: Date.now },
             rating: { type: Number, default: 0 }

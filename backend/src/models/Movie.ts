@@ -1,5 +1,8 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+/** Where the stream comes from. See docs/VIDEO_SOURCES.md. */
+export type MovieSource = 'archive' | 'blender' | 'upload';
+
 export interface IMovie extends Document {
     title: string;
     image: string;
@@ -9,6 +12,9 @@ export interface IMovie extends Document {
     videoUrl: string;
     muxPlaybackId?: string;
     muxAssetId?: string;
+    /** Internet Archive item identifier, for catalog-sourced titles. */
+    archiveId?: string;
+    source: MovieSource;
     description?: string;
     year?: number;
     createdAt: Date;
@@ -48,6 +54,19 @@ const movieSchema = new Schema<IMovie>(
         },
         muxAssetId: {
             type: String,
+        },
+        archiveId: {
+            type: String,
+            unique: true,
+            sparse: true,
+        },
+        source: {
+            // Not every movie has a Mux playback id, which the schema previously
+            // assumed. The discriminator lets the player pick the right path.
+            type: String,
+            enum: ['archive', 'blender', 'upload'],
+            default: 'upload',
+            index: true,
         },
         description: {
             type: String,

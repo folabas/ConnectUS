@@ -1,19 +1,42 @@
 import express from 'express';
-import { createRoom, getRooms, getRoomById, joinRoom, inviteToRoom, startRoom, requestToJoin, approveJoinRequest, rejectJoinRequest, endRoom } from '../controllers/roomController';
+import {
+    createRoom,
+    getRooms,
+    getRoomById,
+    joinRoom,
+    leaveRoom,
+    getRoomMessages,
+    inviteToRoom,
+    startRoom,
+    requestToJoin,
+    approveJoinRequest,
+    rejectJoinRequest,
+    endRoom,
+} from '../controllers/roomController';
 import { authMiddleware } from '../middleware/auth';
+import { writeLimiter } from '../middleware/rateLimit';
 
 const router = express.Router();
 
-// Protected routes
-router.post('/', authMiddleware, createRoom);
-router.get('/', authMiddleware, getRooms);
-router.get('/:id', authMiddleware, getRoomById);
-router.post('/join', authMiddleware, joinRoom);
-router.post('/:id/start', authMiddleware, startRoom);
-router.post('/invite/:friendId', authMiddleware, inviteToRoom);
-router.post('/:id/request-join', authMiddleware, requestToJoin);
-router.post('/:id/approve-request/:userId', authMiddleware, approveJoinRequest);
-router.post('/:id/reject-request/:userId', authMiddleware, rejectJoinRequest);
-router.post('/:id/end', authMiddleware, endRoom);
+router.use(authMiddleware);
+
+router.post('/', writeLimiter, createRoom);
+router.get('/', getRooms);
+
+// `/join` and `/invite` are declared before `/:id` so they are not swallowed by
+// the parameterised route.
+router.post('/join', joinRoom);
+// Previously mounted at `/invite/:friendId` while the handler read a list of
+// emails from the body and ignored the parameter entirely.
+router.post('/invite', writeLimiter, inviteToRoom);
+
+router.get('/:id', getRoomById);
+router.get('/:id/messages', getRoomMessages);
+router.post('/:id/start', startRoom);
+router.post('/:id/end', endRoom);
+router.post('/:id/leave', leaveRoom);
+router.post('/:id/request-join', writeLimiter, requestToJoin);
+router.post('/:id/approve-request/:userId', approveJoinRequest);
+router.post('/:id/reject-request/:userId', rejectJoinRequest);
 
 export default router;

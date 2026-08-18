@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { Movie } from '../models/Movie';
 import { createDirectUpload, getAssetDetails, formatDuration, getUploadDetails } from '../utils/mux';
 import { AuthRequest } from '../middleware/auth';
+import { searchPlayable, resolveArchiveItem } from '../services/archiveService';
 
 // Initial movie data for seeding
 const initialMovies = [
@@ -14,7 +15,8 @@ const initialMovies = [
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
         muxPlaybackId: '36q401a684q7k960015d8000', // Sample Mux Asset
         description: 'A journey through the quantum realm where reality bends and time dissolves.',
-        year: 2025
+        year: 2025,
+        source: 'blender'
     },
     {
         title: 'Dark Velocity',
@@ -25,7 +27,8 @@ const initialMovies = [
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
         muxPlaybackId: '36q401a684q7k960015d8000', // Using same sample for demo
         description: 'High-octane action in a futuristic metropolis where speed is the only currency.',
-        year: 2025
+        year: 2025,
+        source: 'blender'
     },
     {
         title: 'Nebula Dreams',
@@ -35,7 +38,8 @@ const initialMovies = [
         genre: 'Sci-Fi',
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
         description: 'An astronaut discovers a sentient nebula that communicates through dreams.',
-        year: 2025
+        year: 2025,
+        source: 'blender'
     },
     {
         title: 'Silent Echo',
@@ -45,7 +49,8 @@ const initialMovies = [
         genre: 'Drama',
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
         description: 'A powerful drama about a musician who loses their hearing but finds a new voice.',
-        year: 2024
+        year: 2024,
+        source: 'blender'
     },
     {
         title: 'The Last Circuit',
@@ -55,7 +60,8 @@ const initialMovies = [
         genre: 'Thriller',
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
         description: 'A hacker uncovers a conspiracy that threatens to shut down the global grid.',
-        year: 2025
+        year: 2025,
+        source: 'blender'
     },
     {
         title: 'Cosmic Laughter',
@@ -65,7 +71,8 @@ const initialMovies = [
         genre: 'Comedy',
         videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
         description: 'Aliens land on Earth, but they just want to perform stand-up comedy.',
-        year: 2024
+        year: 2024,
+        source: 'blender'
     }
 ];
 
@@ -139,15 +146,26 @@ export const getMovieById = async (req: Request, res: Response): Promise<void> =
 // POST /api/movies/seed
 export const seedMovies = async (req: Request, res: Response): Promise<void> => {
     try {
-        // Clear existing movies
-        await Movie.deleteMany({});
+        // This endpoint used to call Movie.deleteMany({}) behind nothing more
+        // than a valid login, so any registered account could empty the entire
+        // catalog. It is now additive and idempotent: existing titles are left
+        // alone and only missing ones are inserted.
+        const results = await Promise.all(
+            initialMovies.map((movie) =>
+                Movie.updateOne(
+                    { title: movie.title },
+                    { $setOnInsert: movie },
+                    { upsert: true }
+                )
+            )
+        );
 
-        await Movie.insertMany(initialMovies);
+        const inserted = results.filter((result) => result.upsertedCount > 0).length;
 
         res.status(201).json({
             success: true,
-            message: 'Movies seeded successfully',
-            count: initialMovies.length,
+            message: `Seed complete: ${inserted} added, ${initialMovies.length - inserted} already present`,
+            count: inserted,
         });
     } catch (error: any) {
         console.error('Seed movies error:', error);
@@ -250,6 +268,7 @@ export const createMovie = async (req: AuthRequest, res: Response): Promise<void
             image: image || `https://image.mux.com/${muxPlaybackId}/thumbnail.jpg`,
             description: `User uploaded: ${title}`,
             year: new Date().getFullYear(),
+            source: 'upload',
         });
 
         res.status(201).json({
@@ -307,3 +326,108 @@ export const getAsset = async (req: AuthRequest, res: Response): Promise<void> =
     }
 };
 
+/* -------------------------------------------------------------------------- */
+/* Public-domain catalog (Internet Archive)                                   */
+/* -------------------------------------------------------------------------- */
+
+// GET /api/movies/catalog/search
+export const searchCatalog = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const query = String(req.query.q ?? '').trim();
+        const page = Math.max(1, Number(req.query.page) || 1);
+
+        if (query.length < 2) {
+            res.status(400).json({
+                success: false,
+                message: 'Enter at least two characters to search',
+            });
+            return;
+        }
+
+        const results = await searchPlayable(query, page);
+
+        // Flag titles already in the library so the client can hide "Add".
+        const existing = await Movie.find({
+            archiveId: { $in: results.map((result) => result.identifier) },
+        }).select('archiveId');
+        const known = new Set(existing.map((movie) => movie.archiveId));
+
+        res.status(200).json({
+            success: true,
+            count: results.length,
+            data: results
+                .filter((result) => !known.has(result.identifier))
+                .map((result) => ({
+                    // The identifier stands in for _id until the item is imported.
+                    _id: result.identifier,
+                    title: result.title,
+                    image: result.image,
+                    duration: result.duration ?? 'N/A',
+                    rating: 'N/A',
+                    genre: 'Archive',
+                    description: result.description,
+                    year: result.year,
+                    videoUrl: result.videoUrl,
+                    source: 'archive',
+                })),
+        });
+    } catch (error: any) {
+        console.error('Catalog search error:', error);
+        res.status(502).json({
+            success: false,
+            message: 'The public-domain archive is not responding. Try again shortly.',
+        });
+    }
+};
+
+// POST /api/movies/catalog/import
+export const importFromCatalog = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const identifier = String(req.body?.identifier ?? '').trim();
+        if (!identifier) {
+            res.status(400).json({ success: false, message: 'An archive identifier is required' });
+            return;
+        }
+
+        // Importing the same title twice is a no-op rather than an error, since
+        // two people can add the same film at once.
+        const existing = await Movie.findOne({ archiveId: identifier });
+        if (existing) {
+            res.status(200).json({ success: true, data: existing });
+            return;
+        }
+
+        // Re-resolve server-side rather than trusting a client-supplied URL,
+        // which would otherwise let anyone point a library entry anywhere.
+        const item = await resolveArchiveItem(identifier);
+        if (!item?.videoUrl) {
+            res.status(404).json({
+                success: false,
+                message: 'That item has no playable video.',
+            });
+            return;
+        }
+
+        const movie = await Movie.create({
+            title: item.title,
+            image: item.image,
+            duration: item.duration ?? 'N/A',
+            rating: 'N/A',
+            genre: 'Archive',
+            videoUrl: item.videoUrl,
+            description: item.description,
+            year: item.year,
+            source: 'archive',
+            archiveId: identifier,
+        });
+
+        res.status(201).json({ success: true, data: movie });
+    } catch (error: any) {
+        console.error('Catalog import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Could not add that title.',
+            error: error.message,
+        });
+    }
+};
