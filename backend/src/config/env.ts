@@ -53,6 +53,14 @@ const schema = z.object({
     /** Static credentials, used only when TURN_SECRET is absent. */
     TURN_USERNAME: z.string().optional(),
     TURN_PASSWORD: z.string().optional(),
+
+    /**
+     * Cloudflare Realtime TURN. Takes precedence over TURN_URLS when set: its
+     * credentials come from Cloudflare's API rather than a shared secret, and
+     * the key is long-lived so it must never reach the browser.
+     */
+    CLOUDFLARE_TURN_KEY_ID: z.string().optional(),
+    CLOUDFLARE_TURN_API_TOKEN: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -81,10 +89,11 @@ export const env = {
 
     stunUrls: raw.STUN_URLS.split(',').map((u) => u.trim()).filter(Boolean),
     turnUrls: (raw.TURN_URLS ?? '').split(',').map((u) => u.trim()).filter(Boolean),
-    /** TURN is usable: URLs plus either a secret or a static credential pair. */
+    /** TURN is usable: Cloudflare, or URLs plus a secret or credential pair. */
     turnEnabled: Boolean(
-        raw.TURN_URLS &&
-            (raw.TURN_SECRET || (raw.TURN_USERNAME && raw.TURN_PASSWORD)),
+        (raw.CLOUDFLARE_TURN_KEY_ID && raw.CLOUDFLARE_TURN_API_TOKEN) ||
+            (raw.TURN_URLS &&
+                (raw.TURN_SECRET || (raw.TURN_USERNAME && raw.TURN_PASSWORD))),
     ),
 };
 

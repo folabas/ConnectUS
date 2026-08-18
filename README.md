@@ -97,11 +97,20 @@ Peer connections fetch their ICE configuration from `GET /api/webrtc/ice` rather
 than hardcoding it, so TURN credentials can be rotated without a redeploy and are
 never baked into the bundle.
 
-Set `TURN_URLS` plus `TURN_SECRET` and the API issues credentials that expire
-after 12 hours, using the scheme coturn and Twilio both implement: the username
-is `<expiry>:<userId>` and the password is its HMAC-SHA1 under the shared secret.
-Static `TURN_USERNAME`/`TURN_PASSWORD` also work if that is what your provider
-gives you.
+Three providers are supported, in order of precedence:
+
+1. **Cloudflare Realtime** (recommended) — set `CLOUDFLARE_TURN_KEY_ID` and
+   `CLOUDFLARE_TURN_API_TOKEN`. Credentials are minted by Cloudflare's API and
+   cached server-side for half their 24-hour life, so entering a room does not
+   cost a round trip to Cloudflare. 1,000 GB/month free, then $0.05/GB.
+2. **coturn / Twilio shared secret** — `TURN_URLS` + `TURN_SECRET`. The API
+   issues credentials expiring after 12 hours: the username is
+   `<expiry>:<userId>` and the password its HMAC-SHA1 under the secret.
+3. **Static credentials** — `TURN_URLS` + `TURN_USERNAME` + `TURN_PASSWORD`.
+
+If a configured provider is unreachable the API falls back to STUN rather than
+failing the request: an outage should cost relay-dependent users their video,
+not break the room for everyone in it.
 
 Without TURN the app still runs on STUN alone, logs a warning at boot, and tells
 people in the room that connections are direct-only — but expect roughly 10-20%

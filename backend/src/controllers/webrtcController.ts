@@ -2,6 +2,10 @@ import crypto from 'crypto';
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { env } from '../config/env';
+import {
+    getCloudflareIceServers,
+    isCloudflareTurnConfigured,
+} from '../services/cloudflareTurn';
 
 /**
  * ICE configuration for peer connections.
@@ -40,7 +44,20 @@ function timeLimitedCredential(secret: string, userId: string) {
     return { username, credential, expiry };
 }
 
-export function buildIceServers(userId: string): { iceServers: IceServer[]; ttl: number } {
+export async function buildIceServers(
+    userId: string,
+): Promise<{ iceServers: IceServer[]; ttl: number }> {
+    // Cloudflare supplies its own STUN alongside TURN, so when it answers we use
+    // its list wholesale rather than mixing in unrelated public STUN servers.
+    if (isCloudflareTurnConfigured()) {
+        const cloudflare = await getCloudflareIceServers();
+        if (cloudflare?.length) {
+            return { iceServers: cloudflare, ttl: CREDENTIAL_TTL_SECONDS };
+        }
+        // Fall through to STUN below: a Cloudflare outage should degrade video
+        // for relay-dependent users, not break the room for everyone.
+    }
+
     const iceServers: IceServer[] = [
         { urls: env.stunUrls },
     ];
@@ -71,7 +88,7 @@ export const getIceServers = async (req: AuthRequest, res: Response): Promise<vo
         return;
     }
 
-    const { iceServers, ttl } = buildIceServers(userId);
+    const { iceServers, ttl } = await buildIceServers(userId);
 
     res.status(200).json({
         success: true,

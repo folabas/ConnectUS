@@ -35,7 +35,7 @@ they block a launch.
 - [x] Frontend and backend typecheck clean; `next build` succeeds.
 - [x] `npm run lint` clean.
 - [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
-- [x] 51 backend tests pass (`cd backend && npm test`): socket handshake auth,
+- [x] 60 backend tests pass (`cd backend && npm test`): socket handshake auth,
       room membership enforcement, chat delivery/ordering/limits/persistence,
       playback authority, the approval flow including the populate and race
       regressions, watch-stat idempotency, and seed safety.
@@ -60,13 +60,20 @@ they block a launch.
 - [ ] **Configure email.** Password reset and invitations are no-ops without SMTP
       or a Resend key. Password reset in particular is a support burden if it
       silently does nothing.
-- [ ] **TURN credentials.** The application side is done: ICE config is served
-      from `GET /api/webrtc/ice`, time-limited credentials are implemented and
-      verified against an independently computed HMAC, and the UI says so when
-      no relay is available. What remains is buying or hosting one — Twilio,
-      Metered, or self-hosted coturn — and setting `TURN_URLS` + `TURN_SECRET`.
-      Until then roughly 10–20% of users cannot share camera or microphone.
-      Chat and playback are unaffected.
+- [ ] **TURN credentials — sign up for Cloudflare Realtime.** The code is done
+      for all three supported providers; what remains is an account.
+      Sign up at https://dash.cloudflare.com/sign-up (free plan suffices, and
+      you do not need to move DNS), then Realtime -> TURN Keys -> Create, and
+      put the key id and API token in `backend/.env`. Until then roughly 10–20%
+      of users cannot share camera or microphone; chat and playback are
+      unaffected.
+
+      Why Cloudflare: 1,000 GB/month free then $0.05/GB, against Twilio at
+      $0.40–0.80/GB and Metered at $99/mo for 150 GB. At ~500 kbps per stream a
+      relayed user in a four-person room costs ~1.35 GB/hour, so a projected
+      100 parties/month lands near 160 GB — comfortably inside the free tier.
+      Self-hosted coturn on a ~€4.50 VPS with 20 TB traffic is cheaper at scale
+      but means operating the component that rescues your worst-connected users.
 - [ ] **If uploads open to the public:** a DMCA process and a designated agent
       registered with the Copyright Office. Users will upload ripped films.
 
