@@ -43,8 +43,10 @@ describe('Input Component', () => {
   });
 
   it('should render with type password', () => {
-    render(<Input type="password" />);
-    expect(screen.getByRole('textbox')).toHaveAttribute('type', 'password');
+    // A password input deliberately exposes no 'textbox' role, so it has to be
+    // found another way — the original getByRole('textbox') could never match.
+    const { container } = render(<Input type="password" />);
+    expect(container.querySelector('input')).toHaveAttribute('type', 'password');
   });
 
   it('should render with type number', () => {

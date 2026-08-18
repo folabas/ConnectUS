@@ -18,19 +18,26 @@ import type { ChatMessage } from '@/types';
 
 export function useRoomChat(roomId: string) {
   const { socket } = useSocket();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // History is stored alongside the room it belongs to, so `loading` is derived
+  // rather than being a second state set synchronously inside the effect. It
+  // also means a room change cannot briefly show the previous room's messages.
+  const [history, setHistory] = useState<{ roomId: string | null; messages: ChatMessage[] }>({
+    roomId: null,
+    messages: [],
+  });
+
+  const loading = history.roomId !== roomId;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     roomApi
       .messages(roomId)
-      .then((history) => !cancelled && setMessages(history))
+      .then((loaded) => !cancelled && setHistory({ roomId, messages: loaded }))
       .catch(() => {
         // Start with an empty transcript rather than blocking the room.
-      })
-      .finally(() => !cancelled && setLoading(false));
+        if (!cancelled) setHistory({ roomId, messages: [] });
+      });
     return () => {
       cancelled = true;
     };
@@ -38,9 +45,11 @@ export function useRoomChat(roomId: string) {
 
   useSocketEvent('chat-message', (message) => {
     if (message.roomId !== roomId) return;
-    setMessages((current) =>
+    setHistory((current) =>
       // Guard against a duplicate delivery on reconnect.
-      current.some((m) => m.id === message.id) ? current : [...current, message],
+      current.messages.some((m) => m.id === message.id)
+        ? current
+        : { roomId, messages: [...current.messages, message] },
     );
   });
 
@@ -54,5 +63,5 @@ export function useRoomChat(roomId: string) {
     [socket, roomId],
   );
 
-  return { messages, loading, send };
+  return { messages: history.messages, loading, send };
 }

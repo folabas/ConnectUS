@@ -35,11 +35,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated || !user) {
-      setSocket(null);
-      setConnected(false);
-      return;
-    }
+    // No setState on this path: the cleanup from the previous run has already
+    // cleared the socket, so setting it again here would only cascade a render.
+    if (!isAuthenticated || !user) return;
 
     const token = session.getToken();
     if (!token) return;
@@ -68,7 +66,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       setSocket(null);
       setConnected(false);
     };
-    // Re-connect when the signed-in identity changes, not on every user field edit.
+    // Re-connect when the signed-in identity changes, not on every user field
+    // edit — depending on `user` itself would tear the socket down on a profile
+    // rename.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, user?.userId]);
 
   const value = useMemo(() => ({ socket, connected }), [socket, connected]);

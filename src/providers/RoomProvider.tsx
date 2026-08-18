@@ -91,6 +91,9 @@ export function RoomProvider({
   }, [roomId]);
 
   useEffect(() => {
+    // Fetch-on-mount: the room request is the external system this effect
+    // synchronises with, and every setState inside `load` runs after an await.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

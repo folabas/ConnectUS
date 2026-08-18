@@ -100,6 +100,32 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/** What a well-formed API response looks like once parsed. */
+interface Envelope {
+  success?: boolean;
+  data?: unknown;
+  message?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Read the body defensively.
+ *
+ * Proxies and crash handlers return HTML, and 204 has no body at all, so a bare
+ * `response.json()` throws SyntaxError and hides the real status from the caller.
+ */
+async function parseBody(response: Response): Promise<Envelope | null> {
+  const raw = await response.text();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null ? (parsed as Envelope) : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The API wraps every payload as `{ success, data, message }`. This unwraps it
  * and returns `data`, raising `ApiError` on failure.
@@ -140,32 +166,25 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     );
   }
 
-  // Parse defensively: proxies and crash handlers return HTML, and 204 has no body.
-  const raw = await response.text();
-  let payload: any = null;
-  if (raw) {
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      payload = null;
-    }
-  }
+  const payload = await parseBody(response);
 
   if (!response.ok) {
     if (response.status === 401) {
       session.clear();
       onUnauthorized?.();
     }
-    const message =
-      payload?.message ||
-      payload?.error ||
-      `Request failed (${response.status} ${response.statusText})`;
-    throw new ApiError(message, response.status, payload);
+    throw new ApiError(
+      payload?.message ??
+        payload?.error ??
+        `Request failed (${response.status} ${response.statusText})`,
+      response.status,
+      payload,
+    );
   }
 
-  if (payload && typeof payload === 'object' && 'success' in payload) {
+  if (payload && 'success' in payload) {
     if (payload.success === false) {
-      throw new ApiError(payload.message || 'Request failed', response.status, payload);
+      throw new ApiError(payload.message ?? 'Request failed', response.status, payload);
     }
     return payload.data as T;
   }
@@ -181,7 +200,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 async function requestEnvelope<T>(
   path: string,
   options: RequestOptions = {},
-): Promise<{ data: T } & Record<string, any>> {
+): Promise<{ data: T } & Record<string, unknown>> {
   const { method = 'GET', body, auth = true, query } = options;
 
   let url = `${API_URL}${path}`;
@@ -211,15 +230,7 @@ async function requestEnvelope<T>(
     throw new ApiError('Cannot reach the server. Check your connection and try again.', 0, error);
   }
 
-  const raw = await response.text();
-  let payload: any = null;
-  if (raw) {
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      payload = null;
-    }
-  }
+  const payload = await parseBody(response);
 
   if (!response.ok) {
     if (response.status === 401) {
@@ -227,13 +238,13 @@ async function requestEnvelope<T>(
       onUnauthorized?.();
     }
     throw new ApiError(
-      payload?.message || `Request failed (${response.status})`,
+      payload?.message ?? `Request failed (${response.status})`,
       response.status,
       payload,
     );
   }
 
-  return payload ?? {};
+  return (payload ?? {}) as { data: T } & Record<string, unknown>;
 }
 
 /* -------------------------------------------------------------------------- */

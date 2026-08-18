@@ -9,17 +9,25 @@ describe('Card Component', () => {
     expect(document.querySelector('.rounded-xl')).toBeInTheDocument();
   });
 
-  it('should render with border and shadow', () => {
+  it('should mark itself with the card slot', () => {
+    // Asserting on the slot rather than on Tailwind utilities: the previous
+    // assertion expected 'shadow-sm', which this component has never applied.
     const { container } = render(<Card>Content</Card>);
+    expect(container.firstChild).toHaveAttribute('data-slot', 'card');
     expect(container.firstChild).toHaveClass('border');
-    expect(container.firstChild).toHaveClass('shadow-sm');
+  });
+
+  it('should merge a caller className', () => {
+    const { container } = render(<Card className="custom-card">Content</Card>);
+    expect(container.firstChild).toHaveClass('custom-card');
   });
 });
 
 describe('CardHeader Component', () => {
   it('should render card header', () => {
     render(<CardHeader>Header content</CardHeader>);
-    expect(document.querySelector('.flex')).toBeInTheDocument();
+    expect(screen.getByText('Header content')).toBeInTheDocument();
+    expect(document.querySelector('[data-slot="card-header"]')).toBeInTheDocument();
   });
 });
 
@@ -29,9 +37,10 @@ describe('CardTitle Component', () => {
     expect(screen.getByText('Title')).toBeInTheDocument();
   });
 
-  it('should render with font semibold', () => {
+  it('should render the title as a heading', () => {
     const { container } = render(<CardTitle>Title</CardTitle>);
-    expect(container.firstChild).toHaveClass('font-semibold');
+    expect(container.firstChild).toHaveAttribute('data-slot', 'card-title');
+    expect((container.firstChild as HTMLElement).tagName).toBe('H4');
   });
 });
 

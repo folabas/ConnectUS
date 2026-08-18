@@ -28,6 +28,8 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    // Fetch-on-mount; same pattern as RoomProvider.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

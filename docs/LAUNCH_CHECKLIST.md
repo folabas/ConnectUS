@@ -1,0 +1,84 @@
+# Launch Checklist
+
+State as of the `revamp/launch-readiness` branch. Items are grouped by whether
+they block a launch.
+
+## Done
+
+**Security**
+- [x] Socket connections authenticate via JWT in the handshake. Identity is no
+      longer taken from client-supplied payloads.
+- [x] `join-room` verifies room membership server-side before admitting a socket
+      to a room channel.
+- [x] `JWT_SECRET` is validated at boot. It previously fell back to
+      `'default-secret-change-this'`, a value published in this repository.
+- [x] `POST /api/movies/seed` no longer calls `deleteMany({})`. Any authenticated
+      account could previously wipe the entire catalog.
+- [x] Rate limits applied: 10/15min on credentials, 5/hour on password reset,
+      30/min on writes, 1000/15min overall.
+- [x] `helmet` mounted; CORS origins read from `ALLOWED_ORIGINS`.
+- [x] Error responses omit internal messages in production.
+- [x] `backend/dist` untracked.
+- [x] Chat is length-limited and reactions are validated against an allowlist.
+
+**Correctness**
+- [x] Join-request approvals reach the requester (they are sent to the user's own
+      channel, not the room channel the requester has not joined).
+- [x] `moviesWatched` counted once per user per room.
+- [x] No duplicate participants under a join race.
+- [x] Host keeps their seat across a refresh.
+- [x] Multi-tab presence: offline only when the last tab closes.
+- [x] Scheduled and active public rooms are visible in browse.
+- [x] Room invites emit the `room-invite` event the client listens for.
+
+**Quality**
+- [x] Frontend and backend typecheck clean; `next build` succeeds.
+- [x] `npm run lint` clean.
+- [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
+
+## Blocking — needs a decision or an account
+
+- [ ] **Confirm the video source strategy.** See `docs/VIDEO_SOURCES.md`. The
+      Internet Archive integration is built and working; decide whether uploads
+      stay on Mux or move to Bunny/Cloudflare, which are substantially cheaper
+      for this workload.
+- [ ] **Provision production secrets.** A real `JWT_SECRET`, a MongoDB Atlas URI,
+      and `ALLOWED_ORIGINS` set to the production domains.
+- [ ] **Configure email.** Password reset and invitations are no-ops without SMTP
+      or a Resend key. Password reset in particular is a support burden if it
+      silently does nothing.
+- [ ] **TURN server.** WebRTC currently uses public STUN only. Roughly 10–20% of
+      users behind symmetric NAT will fail to connect video without TURN
+      (Twilio, Metered, or self-hosted coturn). Chat and playback are unaffected.
+- [ ] **If uploads open to the public:** a DMCA process and a designated agent
+      registered with the Copyright Office. Users will upload ripped films.
+
+## Non-blocking, but worth doing soon
+
+- [ ] Socket scaling. Presence and room membership live in a per-process `Map`,
+      so more than one backend instance will not share state. Add the Socket.io
+      Redis adapter before scaling horizontally.
+- [ ] Message retention. Chat is stored indefinitely; history returns the newest
+      200. Add a TTL index if storage matters.
+- [ ] Backend tests. The backend has no test runner. The socket authorisation
+      path and the join-approval flow are the highest-value targets.
+- [ ] E2E coverage of the two-user flow: host creates, guest requests, host
+      approves, both watch in sync. This is the product's core promise and is
+      currently only verified by hand.
+- [ ] Archive metadata quality. Titles come in with `genre: 'Archive'` and no
+      rating. A genre-mapping pass would make the library look less uniform.
+- [ ] Observability. There is no error tracking; a Sentry DSN on both halves
+      would pay for itself in the first week.
+- [ ] Accessibility audit with a screen reader. Roles and labels were added
+      throughout the redesign but have not been tested with assistive tech.
+
+## Known limitations
+
+- Room capacity is capped at 10, and WebRTC is full-mesh — every participant
+  connects to every other. Beyond roughly 6 concurrent cameras this becomes
+  bandwidth-bound on the client. An SFU is the fix, and it is a large change.
+- Internet Archive delivery has no SLA and variable bitrate. Acceptable for
+  launch; not a foundation for a paid tier.
+- Playback sync tolerates 0.75s of drift by design. The PRD asks for 500ms;
+  tightening the tolerance costs more visible micro-seeks and should be measured
+  against real sessions before changing.

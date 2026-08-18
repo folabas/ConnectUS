@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    // The forks pool fails to spawn workers on Windows here; threads is stable
+    // and noticeably faster to start for a suite this size.
+    pool: 'threads',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.{test,spec}.{ts,tsx}', '!tests/e2e/**'],
