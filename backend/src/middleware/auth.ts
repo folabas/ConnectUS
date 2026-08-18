@@ -33,9 +33,9 @@ export const authMiddleware = async (
         const token = authHeader.substring(7);
 
         const decoded = verifyToken(token);
-        
-        console.log('[AUTH DEBUG] Token decoded:', decoded);
-        console.log('[AUTH DEBUG] User ID from token:', decoded?.userId);
+
+        // No token logging here: it printed the decoded payload on every single
+        // request, putting user ids and emails into any log aggregator.
 
         // Check if user still exists
         const user = await User.findById(decoded.userId);

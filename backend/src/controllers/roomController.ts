@@ -17,6 +17,10 @@ const generateRoomCode = (): string => {
 /** Cap on a single email-invite batch, so the endpoint is not a mail relay. */
 const MAX_INVITES_PER_REQUEST = 20;
 
+/** The id of a join request's user, whether or not the ref has been populated. */
+const requestUserId = (user: any): string =>
+    (user?._id ?? user)?.toString();
+
 /** Newest N messages returned as history; older ones stay in the database. */
 const MESSAGE_HISTORY_LIMIT = 200;
 
@@ -591,7 +595,11 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
             return;
         }
 
-        const room = await Room.findById(id).populate('joinRequests.user', 'fullName avatarUrl');
+        // Deliberately NOT populating joinRequests.user here: populate replaces
+        // the ObjectId with a document, and the lookup below compares against a
+        // raw id string. With populate the comparison never matched, so every
+        // approval and rejection returned 'Join request not found'.
+        const room = await Room.findById(id);
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
@@ -610,7 +618,9 @@ export const approveJoinRequest = async (req: AuthRequest, res: Response): Promi
         }
 
         // Find the request
-        const request = room.joinRequests?.find(r => r.user.toString() === userId && r.status === 'pending');
+        const request = room.joinRequests?.find(
+            r => requestUserId(r.user) === userId && r.status === 'pending'
+        );
         if (!request) {
             res.status(404).json({ success: false, message: 'Join request not found' });
             return;
@@ -672,7 +682,11 @@ export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promis
             return;
         }
 
-        const room = await Room.findById(id).populate('joinRequests.user', 'fullName avatarUrl');
+        // Deliberately NOT populating joinRequests.user here: populate replaces
+        // the ObjectId with a document, and the lookup below compares against a
+        // raw id string. With populate the comparison never matched, so every
+        // approval and rejection returned 'Join request not found'.
+        const room = await Room.findById(id);
         if (!room) {
             res.status(404).json({ success: false, message: 'Room not found' });
             return;
@@ -685,7 +699,9 @@ export const rejectJoinRequest = async (req: AuthRequest, res: Response): Promis
         }
 
         // Find the request
-        const request = room.joinRequests?.find(r => r.user.toString() === userId && r.status === 'pending');
+        const request = room.joinRequests?.find(
+            r => requestUserId(r.user) === userId && r.status === 'pending'
+        );
         if (!request) {
             res.status(404).json({ success: false, message: 'Join request not found' });
             return;

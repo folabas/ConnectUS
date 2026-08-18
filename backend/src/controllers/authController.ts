@@ -246,7 +246,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
                 resetToken
             );
 
-            console.log('Password reset email sent to:', user.email);
+            // Email addresses stay out of the logs.
+            console.log('Password reset email sent');
         }
     } catch (error: any) {
         console.error('Forgot password error:', error);

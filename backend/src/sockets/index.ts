@@ -99,13 +99,19 @@ export function registerSocketHandlers(io: Server) {
         }
     });
 
-    io.on('connection', async (socket: Socket) => {
+    io.on('connection', (socket: Socket) => {
         const appSocket = socket as AppSocket;
         const { userId } = appSocket.data;
 
         socket.join(userChannel(userId));
         trackSocket(userId, socket.id);
-        await markOnline(io, userId);
+
+        // Presence is updated without blocking. Awaiting it here would delay
+        // listener registration below by a database round trip, and any event
+        // the client emits immediately on connect — `join-room` being the
+        // obvious one — would arrive with no handler attached and be dropped,
+        // leaving the caller waiting on an acknowledgement that never comes.
+        void markOnline(io, userId);
 
         /* -------------------------------------------------------------- */
         /* Rooms                                                          */
