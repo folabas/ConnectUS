@@ -15,17 +15,21 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { status } = useAuth();
+  const { status, signingOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    // A deliberate sign-out already has a destination; redirecting here would
+    // beat it and dump the user on a sign-in form pointing back at the page
+    // they just left.
+    if (signingOut) return;
     if (status === 'anonymous') {
       // Preserve the destination in the URL rather than localStorage, so it
       // survives a different tab completing the sign-in.
       router.replace(`/auth?next=${encodeURIComponent(pathname)}`);
     }
-  }, [status, router, pathname]);
+  }, [status, signingOut, router, pathname]);
 
   if (status !== 'authenticated') {
     return (

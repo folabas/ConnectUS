@@ -28,6 +28,13 @@ interface AuthContextValue {
   user: User | null;
   status: AuthStatus;
   isAuthenticated: boolean;
+  /**
+   * True from the moment sign-out starts until the redirect lands. Route guards
+   * check it so they do not race the sign-out navigation: clearing the session
+   * makes the guard see an anonymous user and bounce to /auth?next=<page>, which
+   * beat signOut's own push to / and left the user staring at a sign-in form.
+   */
+  signingOut: boolean;
   signIn(credentials: { email: string; password: string }): Promise<User>;
   signUp(data: { email: string; password: string; fullName?: string }): Promise<User>;
   signOut(): Promise<void>;
@@ -44,7 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
 
   // Guards against a 401 storm (several parallel requests) triggering N redirects.
-  const signingOut = useRef(false);
+  const expiredRedirect = useRef(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const clearSession = useCallback(() => {
     session.clear();
@@ -54,13 +62,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      if (signingOut.current) return;
-      signingOut.current = true;
+      if (expiredRedirect.current) return;
+      expiredRedirect.current = true;
       clearSession();
       router.replace('/auth?expired=1');
       // Allow a later genuine expiry to redirect again.
       setTimeout(() => {
-        signingOut.current = false;
+        expiredRedirect.current = false;
       }, 1000);
     });
     return () => setUnauthorizedHandler(null);
@@ -125,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOut: AuthContextValue['signOut'] = useCallback(async () => {
+    setSigningOut(true);
     try {
       await authApi.logout();
     } catch {
@@ -162,13 +171,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       status,
       isAuthenticated: status === 'authenticated',
+      signingOut,
       signIn,
       signUp,
       signOut,
       updateUser,
       refresh,
     }),
-    [user, status, signIn, signUp, signOut, updateUser, refresh],
+    [user, status, signingOut, signIn, signUp, signOut, updateUser, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
