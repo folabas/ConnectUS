@@ -20,6 +20,16 @@ const DOWNLOAD_URL = 'https://archive.org/download';
 /** Give up rather than hang a request behind a slow third party. */
 const TIMEOUT_MS = 12_000;
 
+/**
+ * Per-item timeout when resolving a playable file.
+ *
+ * Resolution runs concurrently, so total latency is the slowest single metadata
+ * lookup. Measured against the live API a search took ~11s, almost all of it
+ * waiting on one or two slow items. Capping each lookup trades a couple of
+ * results for a search that returns in a usable time.
+ */
+const RESOLVE_TIMEOUT_MS = 5_000;
+
 /** Derivative formats we can play in a browser, best first. */
 const PLAYABLE_FORMATS = ['h.264', '512Kb MPEG4', 'MPEG4', 'HiRes MPEG4', 'Ogg Video'];
 
@@ -41,9 +51,9 @@ interface ArchiveFile {
     size?: string;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, timeoutMs = TIMEOUT_MS): Promise<T> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
         const response = await fetch(url, {
             signal: controller.signal,
@@ -147,11 +157,14 @@ function escapeQuery(query: string): string {
  * Resolve an identifier to a playable URL plus richer metadata.
  * Returns null when the item has no browser-playable derivative.
  */
-export async function resolveArchiveItem(identifier: string): Promise<ArchiveResult | null> {
+export async function resolveArchiveItem(
+    identifier: string,
+    timeoutMs = TIMEOUT_MS,
+): Promise<ArchiveResult | null> {
     const payload = await fetchJson<{
         metadata?: Record<string, unknown>;
         files?: ArchiveFile[];
-    }>(`${METADATA_URL}/${encodeURIComponent(identifier)}`);
+    }>(`${METADATA_URL}/${encodeURIComponent(identifier)}`, timeoutMs);
 
     const files = payload.files ?? [];
     const metadata = payload.metadata ?? {};
@@ -192,12 +205,14 @@ export async function resolveArchiveItem(identifier: string): Promise<ArchiveRes
  * Resolution runs concurrently — serially this would take 20 round trips.
  */
 export async function searchPlayable(query: string, page = 1): Promise<ArchiveResult[]> {
-    const candidates = await searchArchive(query, page);
+    // 12 rather than 20: each candidate costs a metadata round trip, and a
+    // shorter list of results that arrives quickly beats a longer one that does not.
+    const candidates = await searchArchive(query, page, 12);
 
     const resolved = await Promise.all(
         candidates.map(async (candidate) => {
             try {
-                return await resolveArchiveItem(candidate.identifier);
+                return await resolveArchiveItem(candidate.identifier, RESOLVE_TIMEOUT_MS);
             } catch {
                 // One bad item should not fail the whole search.
                 return null;

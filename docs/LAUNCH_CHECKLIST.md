@@ -35,6 +35,13 @@ they block a launch.
 - [x] Frontend and backend typecheck clean; `next build` succeeds.
 - [x] `npm run lint` clean.
 - [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
+- [x] 41 realtime assertions pass against a live server and database
+      (`cd backend && npm run verify:realtime`): socket auth, room membership,
+      chat delivery and ordering, playback sync, WebRTC relay, reactions, the
+      approval flow, and departure.
+- [x] Manual walkthrough, sign-up through sign-out: landing -> auth -> library ->
+      archive search -> import -> create room -> lobby -> start -> watch -> chat
+      -> settings -> sign out. Route guards and `next` preservation verified.
 
 ## Blocking — needs a decision or an account
 
@@ -72,6 +79,17 @@ they block a launch.
 - [ ] Accessibility audit with a screen reader. Roles and labels were added
       throughout the redesign but have not been tested with assistive tech.
 
+## Verified against real infrastructure
+
+- The Internet Archive integration returns genuinely playable films. An imported
+  title (`Nosferatu (1922)`) stored a URL that serves `HTTP 206 Partial Content`
+  with `Accept-Ranges: bytes` on a 493MB MP4 whose `moov` atom sits at byte 36,
+  so it is faststart-optimised and seekable.
+- Archive search latency is ~6s (down from ~11s after capping per-item metadata
+  lookups at 5s and trimming the candidate list to 12). It is a third-party
+  dependency with no SLA; the UI shows a spinner throughout. If it needs to be
+  faster, cache resolved identifiers in Mongo and serve repeat searches locally.
+
 ## Known limitations
 
 - Room capacity is capped at 10, and WebRTC is full-mesh — every participant
@@ -79,6 +97,10 @@ they block a launch.
   bandwidth-bound on the client. An SFU is the fix, and it is a large change.
 - Internet Archive delivery has no SLA and variable bitrate. Acceptable for
   launch; not a foundation for a paid tier.
+- Browser playback of archive files was not confirmed end to end: the preview
+  pane used for verification never issued the media requests. The URL itself is
+  proven streamable and seekable by direct HTTP, and the player is wired to it,
+  but it is worth opening a room in a real browser before launch.
 - Playback sync tolerates 0.75s of drift by design. The PRD asks for 500ms;
   tightening the tolerance costs more visible micro-seeks and should be measured
   against real sessions before changing.
