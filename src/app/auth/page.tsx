@@ -4,11 +4,12 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Loader2, Lock, Mail, User as UserIcon, Video } from 'lucide-react';
+import { ArrowLeft, Loader2, Lock, Mail, User as UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LogoMark } from '@/components/brand/Logo';
 import { authApi, errorMessage } from '@/lib/api';
 import { useAuth } from '@/providers/AuthProvider';
 import { cn, field, focusRing } from '@/lib/ui';
@@ -127,7 +128,7 @@ function AuthForm() {
             className="max-w-md space-y-6 text-center"
           >
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-xl">
-              <Video className="h-10 w-10" />
+              <LogoMark size={44} monochrome className="text-white" />
             </div>
             <h2 className="text-4xl tracking-tight">Movie night, wherever everyone is</h2>
             <p className="text-lg leading-relaxed text-white/80">

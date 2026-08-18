@@ -18,7 +18,6 @@ import {
   Plus,
   Settings as SettingsIcon,
   User as UserIcon,
-  Video,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Logo } from '@/components/brand/Logo';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 import { useAuth } from '@/providers/AuthProvider';
 import { cn, focusRing, initials } from '@/lib/ui';
@@ -47,14 +47,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#0D0D0F] text-white">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0D0D0F]/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
-          <Link
-            href="/library"
-            className={cn('flex items-center gap-2.5 shrink-0 rounded-lg', focusRing)}
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#695CFF]">
-              <Video className="h-5 w-5" />
-            </span>
-            <span className="hidden text-lg font-medium tracking-tight sm:block">ConnectUs</span>
+          <Link href="/library" className={cn('shrink-0 rounded-lg', focusRing)} aria-label="ConnectUs home">
+            <Logo size={30} className="[&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
           </Link>
 
           <nav className="flex items-center gap-1" aria-label="Main">
