@@ -35,6 +35,12 @@ they block a launch.
 - [x] Frontend and backend typecheck clean; `next build` succeeds.
 - [x] `npm run lint` clean.
 - [x] 77 unit tests pass, covering the API client, playback sync, and formatting.
+- [x] 40 backend tests pass (`cd backend && npm test`): socket handshake auth,
+      room membership enforcement, chat delivery/ordering/limits/persistence,
+      playback authority, the approval flow including the populate and race
+      regressions, watch-stat idempotency, and seed safety.
+- [x] Email and Mux are genuinely optional: the API boots and reports them as
+      disabled instead of crashing on a missing key.
 - [x] 41 realtime assertions pass against a live server and database
       (`cd backend && npm run verify:realtime`): socket auth, room membership,
       chat delivery and ordering, playback sync, WebRTC relay, reactions, the
@@ -67,8 +73,6 @@ they block a launch.
       Redis adapter before scaling horizontally.
 - [ ] Message retention. Chat is stored indefinitely; history returns the newest
       200. Add a TTL index if storage matters.
-- [ ] Backend tests. The backend has no test runner. The socket authorisation
-      path and the join-approval flow are the highest-value targets.
 - [ ] E2E coverage of the two-user flow: host creates, guest requests, host
       approves, both watch in sync. This is the product's core promise and is
       currently only verified by hand.

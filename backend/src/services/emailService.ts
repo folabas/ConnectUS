@@ -1,6 +1,24 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+/**
+ * Resend is constructed lazily, and only when a key is configured.
+ *
+ * It used to be built at module load from `process.env.RESEND_API_KEY`. The
+ * Resend constructor throws when the key is missing, and this module is on the
+ * import path of roomRoutes, so a deployment without the variable did not
+ * degrade to "email is off" — the whole API failed to boot. Email is documented
+ * as optional; now it behaves that way.
+ */
+let client: Resend | null = null;
+
+function getClient(): Resend | null {
+    if (!process.env.RESEND_API_KEY) return null;
+    if (!client) client = new Resend(process.env.RESEND_API_KEY);
+    return client;
+}
+
+/** True when outbound email is configured. */
+export const emailConfigured = (): boolean => Boolean(process.env.RESEND_API_KEY);
 
 interface RoomInviteData {
     toEmail: string;
@@ -62,6 +80,12 @@ export const emailService = {
                 </html>
             `;
 
+            const resend = getClient();
+            if (!resend) {
+                console.warn('Email is not configured; skipping room invite to', data.toEmail.replace(/(.{2}).*(@.*)/, '$1***$2'));
+                return false;
+            }
+
             await resend.emails.send({
                 from: 'ConnectUS <invites@connectus.app>',
                 to: data.toEmail,
@@ -121,6 +145,12 @@ export const emailService = {
                 </body>
                 </html>
             `;
+
+            const resend = getClient();
+            if (!resend) {
+                console.warn('Email is not configured; skipping password reset send');
+                return false;
+            }
 
             await resend.emails.send({
                 from: 'ConnectUS <noreply@connectus.app>',
