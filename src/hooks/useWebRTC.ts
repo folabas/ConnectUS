@@ -107,6 +107,8 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
   // Signalling that arrived before media settled, replayed once it has.
   const mediaSettledRef = useRef(false);
   const pendingPeers = useRef<Map<string, PeerAddress>>(new Map());
+  /** Rooms we have already announced readiness for, to avoid re-announcing. */
+  const announced = useRef<string | null>(null);
   const pendingOffers = useRef<Map<string, PendingOffer>>(new Map());
 
   // Held in a ref so a late-arriving config is picked up by connections created
@@ -192,6 +194,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       setLocalStream(null);
       mediaSettledRef.current = false;
       setMediaSettled(false);
+      announced.current = null;
     };
   }, [enabled]);
 
@@ -390,6 +393,12 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     // Tell the room we can answer now. Whoever should initiate towards us will
     // do so on hearing this, which is the half that was missing: we were
     // discoverable but nobody knew we had started listening.
+    // Announcing twice makes the other side discard a perfectly good connection
+    // and renegotiate from scratch, which showed up in the logs as a duplicate
+    // "peer is ready" and a needless "replacing stale connection".
+    if (announced.current === roomId) return;
+    announced.current = roomId;
+
     trace('announcing readiness; my socket is', socket.id);
     socket.emit('peer-ready', roomId);
 

@@ -2,11 +2,11 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowRight,
+  Check,
   Gauge,
   Lock,
   MessageSquare,
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/Logo';
 import { Reveal, RevealGroup } from '@/components/landing/Reveal';
 import { SyncVisual } from '@/components/landing/SyncVisual';
+import { FilmReel } from '@/components/landing/FilmReel';
 import { useAuth } from '@/providers/AuthProvider';
 import { EASE } from '@/lib/motion';
 import { cn, focusRing } from '@/lib/ui';
@@ -35,12 +36,12 @@ const CAPABILITIES = [
   {
     icon: Gauge,
     title: 'Sync that holds',
-    body: 'Play, pause and seek propagate with the network delay measured out of them. No counting down over voice chat.',
+    body: 'Play, pause and seek propagate with the network delay measured out of them, so nobody is counting down over voice chat.',
   },
   {
     icon: MessageSquare,
     title: 'A conversation that stays',
-    body: 'Chat lives with the room, not the tab. Arrive late and read back what you missed.',
+    body: 'Chat lives with the room, not the tab. Arrive late and read back everything you missed.',
   },
   {
     icon: Video,
@@ -55,12 +56,12 @@ const CAPABILITIES = [
   {
     icon: Users,
     title: 'Built for a group',
-    body: 'Up to ten people, a lobby to gather in, and one host holding the remote.',
+    body: 'Up to ten people, a lobby to gather in, and one host holding the remote — or nobody, if you prefer.',
   },
   {
     icon: Radio,
     title: 'Nothing to install',
-    body: 'No extension, no download for your friends. Send a link and they are in the room.',
+    body: 'No extension and no download for your friends. Send a link and they are in the room.',
   },
 ];
 
@@ -68,17 +69,47 @@ const STEPS = [
   {
     n: '01',
     title: 'Choose the film',
-    body: 'Thousands of freely licensed titles, searchable from the library — or bring your own upload.',
+    body: 'Search thousands of public-domain titles from inside the app and add one to your library in a click.',
   },
   {
     n: '02',
     title: 'Open the room',
-    body: 'Name it, decide who gets in, and send the code. Everyone gathers in the lobby.',
+    body: 'Name it, decide who gets in, and share the six-character code. Everyone gathers in the lobby first.',
   },
   {
     n: '03',
     title: 'Press play once',
-    body: 'One press, and every screen lands on the same frame. You hold the remote for the rest.',
+    body: 'One press and every screen lands on the same frame. You hold the remote for the rest of the night.',
+  },
+];
+
+const REQUIREMENTS = [
+  'A modern browser — Chrome, Edge, Firefox or Safari',
+  'A free account, for you and for anyone joining',
+  'A camera and microphone, only if you want to be seen and heard',
+  'Nothing else: no extension, no plugin, no subscription',
+];
+
+const FAQ = [
+  {
+    q: 'Which films can I watch?',
+    a: 'Public-domain and openly licensed cinema — thousands of titles, searchable from the library and free to watch. Modern studio releases are not available here, and no service can legally offer those to a third-party app.',
+  },
+  {
+    q: 'Does everyone need an account?',
+    a: 'Yes, so the host knows who is asking to come in and chat has a name against it. Signing up takes a moment and costs nothing.',
+  },
+  {
+    q: 'What if my camera does not work?',
+    a: 'You still get the film, the chat and the reactions, and you still see everyone else. Video is optional, and declining the camera prompt does not hold the room up.',
+  },
+  {
+    q: 'How many people fit in a room?',
+    a: 'Ten. Video is peer-to-peer, so beyond roughly six live cameras the bandwidth starts to tell on slower connections.',
+  },
+  {
+    q: 'Can I watch something of my own?',
+    a: 'Uploads are supported when configured, though the public catalogue is where most rooms start.',
   },
 ];
 
@@ -87,10 +118,10 @@ export default function LandingPage() {
   const { status } = useAuth();
   const reduced = useReducedMotion();
 
-  // Someone already signed in wants the product, not the pitch.
-  useEffect(() => {
-    if (status === 'authenticated') router.replace('/library');
-  }, [status, router]);
+  // The landing page is a page, not a redirect. It used to bounce signed-in
+  // visitors straight to /library, which meant nobody could actually read it
+  // once they had an account — including anyone arriving from a shared link.
+  const signedIn = status === 'authenticated';
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-white">
@@ -100,7 +131,7 @@ export default function LandingPage() {
           reader users who should not have to walk the nav every time. */}
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[var(--brand)] focus:px-4 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[var(--brand)] focus:px-4 focus:py-2 focus:text-[var(--brand-ink)]"
       >
         Skip to content
       </a>
@@ -108,37 +139,61 @@ export default function LandingPage() {
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[var(--bg)]/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
           <Logo size={30} />
+
+          <nav className="hidden items-center gap-6 text-sm text-white/55 md:flex" aria-label="Sections">
+            <a href="#how" className={cn('rounded transition-colors hover:text-white', focusRing)}>
+              How it works
+            </a>
+            <a href="#features" className={cn('rounded transition-colors hover:text-white', focusRing)}>
+              Features
+            </a>
+            <a href="#library" className={cn('rounded transition-colors hover:text-white', focusRing)}>
+              Library
+            </a>
+            <a href="#faq" className={cn('rounded transition-colors hover:text-white', focusRing)}>
+              FAQ
+            </a>
+          </nav>
+
           <div className="flex items-center gap-1 sm:gap-3">
-            <Link
-              href="/auth"
-              className={cn(
-                // min-h-11 keeps the tap target at 44px on touch, where the
-                // visual padding alone left it at 36.
-                'flex min-h-11 items-center rounded-xl px-3 text-sm text-white/70 transition-colors hover:text-white sm:px-4',
-                focusRing,
-              )}
-            >
-              Sign in
-            </Link>
-            <Button
-              onClick={() => router.push('/auth')}
-              className="h-11 rounded-xl bg-white px-4 text-[var(--bg)] hover:bg-white/90"
-            >
-              Get started
-            </Button>
+            {signedIn ? (
+              <Button
+                onClick={() => router.push('/library')}
+                className="h-11 rounded-xl bg-[var(--brand)] px-4 text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
+              >
+                Open the app
+              </Button>
+            ) : (
+              <>
+                <Link
+                  href="/auth"
+                  className={cn(
+                    'flex min-h-11 items-center rounded-xl px-3 text-sm text-white/70 transition-colors hover:text-white sm:px-4',
+                    focusRing,
+                  )}
+                >
+                  Sign in
+                </Link>
+                <Button
+                  onClick={() => router.push('/auth')}
+                  className="h-11 rounded-xl bg-white px-4 text-[var(--bg)] hover:bg-white/90"
+                >
+                  Get started
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
 
       <main id="main">
         {/* ---------------------------------------------------------------- */}
-        {/* Hero — the one cinematic moment on the page                      */}
+        {/* Hero                                                             */}
         {/* ---------------------------------------------------------------- */}
         <section className="relative overflow-hidden px-5 pb-16 pt-16 sm:px-8 sm:pb-24 sm:pt-24">
-          {/* A single blurred gradient, not a stack of filters. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute left-1/2 top-[-16rem] h-[30rem] w-[38rem] -translate-x-1/2 rounded-full bg-[var(--brand)]/10 blur-[120px]"
+            className="projector-beam pointer-events-none absolute left-1/2 top-[-16rem] h-[30rem] w-[38rem] -translate-x-1/2 rounded-full bg-[var(--brand)]/10 blur-[120px]"
           />
 
           <div className="relative mx-auto max-w-6xl">
@@ -174,8 +229,9 @@ export default function LandingPage() {
                   transition={{ duration: 0.6, ease: EASE, delay: 0.14 }}
                   className="mt-6 max-w-md text-lg leading-relaxed text-white/60"
                 >
-                  ConnectUs keeps a film in step across every screen, and puts the chat,
-                  the reactions and everyone&apos;s faces right beside it.
+                  ConnectUs is a watch party that actually stays in step. One person
+                  presses play and every screen lands on the same second, with the chat,
+                  the reactions and everyone&apos;s faces right beside the film.
                 </motion.p>
 
                 <motion.div
@@ -185,14 +241,14 @@ export default function LandingPage() {
                   className="mt-9 flex flex-col gap-3 sm:flex-row"
                 >
                   <Button
-                    onClick={() => router.push('/auth')}
-                    className="group h-12 rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-6 text-base hover:bg-[var(--brand-hover)] sm:w-auto"
+                    onClick={() => router.push(signedIn ? '/rooms/new' : '/auth')}
+                    className="group h-12 rounded-xl bg-[var(--brand)] px-6 text-base text-[var(--brand-ink)] hover:bg-[var(--brand-hover)] sm:w-auto"
                   >
-                    Start a watch party
+                    {signedIn ? 'Host a room' : 'Start a watch party'}
                     <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                   </Button>
                   <Button
-                    onClick={() => router.push('/auth?next=/rooms')}
+                    onClick={() => router.push(signedIn ? '/rooms' : '/auth?next=/rooms')}
                     variant="outline"
                     className="h-12 rounded-xl border-white/15 bg-transparent px-6 text-base text-white hover:bg-white/[0.06] sm:w-auto"
                   >
@@ -206,7 +262,7 @@ export default function LandingPage() {
                   transition={{ duration: 0.6, delay: 0.3 }}
                   className="mt-6 text-sm text-white/35"
                 >
-                  Free to start · No extension · Nothing for your friends to install
+                  Free · No extension · Nothing for your friends to install
                 </motion.p>
               </div>
 
@@ -216,22 +272,71 @@ export default function LandingPage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Statement — negative space doing the work                        */}
+        {/* The reel                                                         */}
         {/* ---------------------------------------------------------------- */}
-        <section className="px-5 py-24 sm:px-8 sm:py-36">
-          <Reveal level="section" className="mx-auto max-w-3xl text-center">
-            <p className="text-[1.75rem] leading-[1.35] tracking-[-0.02em] text-white/85 sm:text-[2.5rem]">
-              Watching something together used to mean being in the same room.
-              <span className="text-white/35"> Then it meant three people counting
-              down over a group chat and still landing four seconds apart.</span>
+        <section id="library" className="border-y border-white/[0.06] py-14">
+          <Reveal className="mx-auto mb-8 max-w-6xl px-5 sm:px-8">
+            <p className="text-sm uppercase tracking-[0.15em] text-white/35">
+              In the library tonight
+            </p>
+          </Reveal>
+
+          <FilmReel />
+
+          <Reveal className="mx-auto mt-8 max-w-6xl px-5 sm:px-8">
+            <p className="max-w-xl text-white/50">
+              Thousands of public-domain and openly licensed films, searchable from inside
+              the app and free to watch — no licensing fine print, no regional blackouts.
             </p>
           </Reveal>
         </section>
 
         {/* ---------------------------------------------------------------- */}
+        {/* Statement                                                        */}
+        {/* ---------------------------------------------------------------- */}
+        <section className="px-5 py-24 sm:px-8 sm:py-32">
+          <Reveal level="section" className="mx-auto max-w-3xl text-center">
+            <p className="text-[1.75rem] leading-[1.35] tracking-[-0.02em] text-white/85 sm:text-[2.5rem]">
+              Watching something together used to mean being in the same room.
+              <span className="text-white/35"> Then it meant three people counting down
+              over a group chat and still landing four seconds apart.</span>
+            </p>
+          </Reveal>
+        </section>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* How it works                                                     */}
+        {/* ---------------------------------------------------------------- */}
+        <section
+          id="how"
+          className="border-y border-white/[0.06] bg-white/[0.015] px-5 py-24 sm:px-8 sm:py-32"
+        >
+          <div className="mx-auto max-w-6xl">
+            <Reveal className="max-w-xl">
+              <h2 className="text-3xl tracking-[-0.02em] sm:text-4xl">
+                Three steps, then the film
+              </h2>
+            </Reveal>
+
+            <RevealGroup className="mt-14 grid gap-12 sm:grid-cols-3 sm:gap-8">
+              {STEPS.map((step) => (
+                <Reveal key={step.n}>
+                  <div className="flex items-baseline gap-4">
+                    <span className="font-mono text-sm text-[var(--brand-soft)]">{step.n}</span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <h3 className="mt-5 text-xl tracking-[-0.01em]">{step.title}</h3>
+                  <p className="mt-2.5 leading-relaxed text-white/50">{step.body}</p>
+                </Reveal>
+              ))}
+            </RevealGroup>
+          </div>
+        </section>
+
+        {/* ---------------------------------------------------------------- */}
         {/* Capabilities                                                     */}
         {/* ---------------------------------------------------------------- */}
-        <section className="px-5 pb-24 sm:px-8 sm:pb-36">
+        <section id="features" className="px-5 py-24 sm:px-8 sm:py-32">
           <div className="mx-auto max-w-6xl">
             <Reveal className="max-w-xl">
               <h2 className="text-3xl tracking-[-0.02em] sm:text-4xl">
@@ -267,25 +372,25 @@ export default function LandingPage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* How it works                                                     */}
+        {/* What you need                                                    */}
         {/* ---------------------------------------------------------------- */}
-        <section className="border-y border-white/[0.06] bg-white/[0.015] px-5 py-24 sm:px-8 sm:py-36">
-          <div className="mx-auto max-w-6xl">
-            <Reveal className="max-w-xl">
-              <h2 className="text-3xl tracking-[-0.02em] sm:text-4xl">
-                Three steps, then the film
-              </h2>
+        <section className="border-y border-white/[0.06] bg-white/[0.015] px-5 py-24 sm:px-8 sm:py-32">
+          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:gap-16">
+            <Reveal>
+              <h2 className="text-3xl tracking-[-0.02em] sm:text-4xl">What you need</h2>
+              <p className="mt-3 max-w-md text-white/55">
+                Almost nothing, deliberately — the friction in a watch party is usually
+                everyone installing something before the film can start.
+              </p>
             </Reveal>
 
-            <RevealGroup className="mt-14 grid gap-12 sm:grid-cols-3 sm:gap-8">
-              {STEPS.map((step) => (
-                <Reveal key={step.n}>
-                  <div className="flex items-baseline gap-4">
-                    <span className="font-mono text-sm text-[var(--brand-soft)]">{step.n}</span>
-                    <span className="h-px flex-1 bg-white/10" />
-                  </div>
-                  <h3 className="mt-5 text-xl tracking-[-0.01em]">{step.title}</h3>
-                  <p className="mt-2.5 leading-relaxed text-white/50">{step.body}</p>
+            <RevealGroup as="ul" className="space-y-4">
+              {REQUIREMENTS.map((requirement) => (
+                <Reveal as="li" key={requirement} className="flex items-start gap-3">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand)]/15">
+                    <Check className="h-3 w-3 text-[var(--brand-soft)]" />
+                  </span>
+                  <span className="leading-relaxed text-white/70">{requirement}</span>
                 </Reveal>
               ))}
             </RevealGroup>
@@ -293,19 +398,23 @@ export default function LandingPage() {
         </section>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Catalog note — honest about where films come from                */}
+        {/* FAQ                                                              */}
         {/* ---------------------------------------------------------------- */}
-        <section className="px-5 py-24 sm:px-8 sm:py-32">
-          <Reveal className="mx-auto max-w-2xl text-center">
-            <h2 className="text-2xl tracking-[-0.02em] sm:text-3xl">
-              Thousands of films, properly licensed
-            </h2>
-            <p className="mt-4 leading-relaxed text-white/55">
-              The library is built on public-domain and openly licensed cinema — searchable
-              from inside the app, and free to watch. Bring your own uploads for
-              anything else.
-            </p>
-          </Reveal>
+        <section id="faq" className="px-5 py-24 sm:px-8 sm:py-32">
+          <div className="mx-auto max-w-3xl">
+            <Reveal>
+              <h2 className="text-3xl tracking-[-0.02em] sm:text-4xl">Questions</h2>
+            </Reveal>
+
+            <RevealGroup as="ul" className="mt-10 divide-y divide-white/[0.07]">
+              {FAQ.map((item) => (
+                <Reveal as="li" key={item.q} className="py-6">
+                  <h3 className="text-lg tracking-[-0.01em]">{item.q}</h3>
+                  <p className="mt-2 leading-relaxed text-white/55">{item.a}</p>
+                </Reveal>
+              ))}
+            </RevealGroup>
+          </div>
         </section>
 
         {/* ---------------------------------------------------------------- */}
@@ -324,10 +433,10 @@ export default function LandingPage() {
                   <span className="italic text-[var(--brand-soft)]"> one link</span> away.
                 </h2>
                 <Button
-                  onClick={() => router.push('/auth')}
+                  onClick={() => router.push(signedIn ? '/library' : '/auth')}
                   className="group mt-10 h-12 rounded-xl bg-white px-7 text-base text-[var(--bg)] hover:bg-white/90"
                 >
-                  Create your account
+                  {signedIn ? 'Open the app' : 'Create your account'}
                   <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Button>
               </div>

@@ -302,3 +302,45 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Landing motion.
+
+   All of it runs on transform/opacity so the compositor handles it without a
+   layout or paint pass. No video files: a hero loop would be megabytes on first
+   paint, which is the opposite of what this page is for.
+   --------------------------------------------------------------------------- */
+
+@keyframes reel-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes projector-flicker {
+  0%, 100% { opacity: 0.38; }
+  45%      { opacity: 0.52; }
+  70%      { opacity: 0.34; }
+}
+
+@keyframes drift-up {
+  from { transform: translate3d(0, 8px, 0); opacity: 0; }
+  to   { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+@keyframes scan {
+  from { transform: translate3d(0, -100%, 0); }
+  to   { transform: translate3d(0, 400%, 0); }
+}
+
+.reel-track { animation: reel-scroll 42s linear infinite; }
+.reel-track:hover { animation-play-state: paused; }
+.projector-beam { animation: projector-flicker 6s ease-in-out infinite; }
+.scanline { animation: scan 7s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-track,
+  .projector-beam,
+  .scanline {
+    animation: none !important;
+  }
+}
