@@ -606,12 +606,14 @@ export const requestToJoin = async (req: AuthRequest, res: Response): Promise<vo
             return;
         }
 
-        // Check if there's already a pending request
+        // Asking again while a request is already pending is a no-op, not an
+        // error. The client sends this automatically on arrival, so a refresh
+        // would otherwise surface a failure for something that is working.
         const existingRequest = room.joinRequests?.find(
-            r => r.user.toString() === userId && r.status === 'pending'
+            r => requestUserId(r.user) === userId && r.status === 'pending'
         );
         if (existingRequest) {
-            res.status(400).json({ success: false, message: 'You already have a pending request' });
+            res.status(200).json({ success: true, message: 'Request already pending' });
             return;
         }
 

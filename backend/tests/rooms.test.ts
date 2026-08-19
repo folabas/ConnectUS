@@ -127,6 +127,29 @@ describe('join approval', () => {
         expect(await rejected).toMatchObject({ roomId });
     });
 
+    it('treats asking twice as a no-op rather than an error', async () => {
+        // The client sends this automatically on arrival, so a refresh while a
+        // request is already pending must not surface a failure for something
+        // that is working. It used to return 400.
+        const first = await api(`/api/rooms/${roomId}/request-join`, {
+            method: 'POST',
+            token: guest.token,
+        });
+        const second = await api(`/api/rooms/${roomId}/request-join`, {
+            method: 'POST',
+            token: guest.token,
+        });
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+
+        // And it must not have queued a duplicate.
+        const { Room } = await import('../src/models/Room');
+        const room = await Room.findById(roomId);
+        const pending = room!.joinRequests!.filter((r) => r.status === 'pending');
+        expect(pending).toHaveLength(1);
+    });
+
     it('lets a rejected user ask again', async () => {
         // Rejection used to be permanent with no way for the host to relent.
         await api(`/api/rooms/${roomId}/request-join`, { method: 'POST', token: guest.token });
@@ -233,6 +256,60 @@ describe('membership and capacity', () => {
             body: { roomId: room._id },
         });
         expect(result.status).toBe(400);
+    });
+
+    it('lets the host end a room after someone has left', async () => {
+        // Production 500. leave/disconnect write joinRequests[].status = 'left'
+        // through updateOne, which skips validation. 'left' was missing from the
+        // schema enum, so the next room.save() validated the whole document,
+        // hit the unknown value and threw. In practice: once one person left,
+        // the host could never end their own room again. start/approve/reject
+        // use the same save() and failed identically.
+        const host = await registerUser(api, 'Host');
+        const guest = await registerUser(api, 'Guest');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString(), {
+            approvalRequired: true,
+            type: 'private',
+        });
+
+        await api(`/api/rooms/${room._id}/request-join`, { method: 'POST', token: guest.token });
+        await api(`/api/rooms/${room._id}/approve-request/${guest.userId}`, {
+            method: 'POST',
+            token: host.token,
+        });
+        await api(`/api/rooms/${room._id}/leave`, { method: 'POST', token: guest.token });
+
+        // Precondition: the request really is parked in the 'left' state.
+        const { Room } = await import('../src/models/Room');
+        const stored = await Room.findById(room._id);
+        expect(stored!.joinRequests!.some((r) => r.status === 'left')).toBe(true);
+
+        const ended = await api(`/api/rooms/${room._id}/end`, {
+            method: 'POST',
+            token: host.token,
+        });
+        expect(ended.status).toBe(200);
+    });
+
+    it('lets the host start a room after someone has left', async () => {
+        const host = await registerUser(api, 'Host');
+        const guest = await registerUser(api, 'Guest');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString());
+
+        await api('/api/rooms/join', {
+            method: 'POST',
+            token: guest.token,
+            body: { roomId: room._id },
+        });
+        await api(`/api/rooms/${room._id}/leave`, { method: 'POST', token: guest.token });
+
+        const started = await api(`/api/rooms/${room._id}/start`, {
+            method: 'POST',
+            token: host.token,
+        });
+        expect(started.status).toBe(200);
     });
 
     it('stops the host leaving instead of ending the room', async () => {

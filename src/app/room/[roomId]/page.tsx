@@ -74,10 +74,10 @@ export default function RoomLobbyPage() {
           >
             <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.secondary }} />
           </span>
-          <h1 className="mt-5 text-xl tracking-tight">Waiting for the host</h1>
+          <h1 className="mt-5 text-xl tracking-tight">Asked to join</h1>
           <p className="mt-2 text-white/60">
-            {room.host?.fullName ?? 'The host'} needs to let you into &ldquo;{room.name}&rdquo;.
-            This page updates the moment they do.
+            {room.host?.fullName ?? 'The host'} has been asked to let you into
+            &ldquo;{room.name}&rdquo;. This page updates the moment they answer.
           </p>
           <div className="mt-6 flex justify-center gap-3">
             <Button
@@ -87,8 +87,11 @@ export default function RoomLobbyPage() {
             >
               Leave
             </Button>
-            <Button onClick={() => void requestToJoin()} className="rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]">
-              Ask again
+            <Button
+              onClick={() => void requestToJoin()}
+              className="rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] hover:bg-[var(--brand-hover)]"
+            >
+              Nudge the host
             </Button>
           </div>
         </div>

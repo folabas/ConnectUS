@@ -28,7 +28,7 @@ export interface IRoom extends Document {
     joinRequests: {
         user: mongoose.Types.ObjectId;
         requestedAt: Date;
-        status: 'pending' | 'approved' | 'rejected';
+        status: 'pending' | 'approved' | 'rejected' | 'left';
     }[];
     approvalRequired: boolean;
     status: 'waiting' | 'scheduled' | 'active' | 'playing' | 'finished';
@@ -104,7 +104,17 @@ const roomSchema = new Schema<IRoom>(
             {
                 user: { type: Schema.Types.ObjectId, ref: 'User' },
                 requestedAt: { type: Date, default: Date.now },
-                status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' }
+                status: {
+                    type: String,
+                    // 'left' is written by the leave and disconnect handlers via
+                    // updateOne, which skips validation. It was missing here, so
+                    // any later save() — end, start, approve, reject — validated
+                    // the whole document, hit the unknown value and threw. In
+                    // practice: once one person had left, the host could no
+                    // longer end their own room.
+                    enum: ['pending', 'approved', 'rejected', 'left'],
+                    default: 'pending',
+                }
             },
         ],
         approvalRequired: {

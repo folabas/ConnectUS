@@ -74,6 +74,13 @@ export function RoomProvider({
   /** Set once we have joined the socket room, so reconnects can re-join. */
   const joinedRef = useRef(false);
 
+  // Read inside `load` without making it a dependency, which would re-run the
+  // join every time the user object is replaced.
+  const userIdRef = useRef(user?.userId);
+  useEffect(() => {
+    userIdRef.current = user?.userId;
+  }, [user?.userId]);
+
   /* ---------------------------------------------------------------------- */
   /* Initial load                                                           */
   /* ---------------------------------------------------------------------- */
@@ -83,7 +90,35 @@ export function RoomProvider({
       const result = await roomApi.join({ roomId });
       setRoom(result.room);
       setError(null);
-      setPhase(result.requiresApproval ? 'pending-approval' : 'member');
+
+      if (!result.requiresApproval) {
+        setPhase('member');
+        return;
+      }
+
+      setPhase('pending-approval');
+
+      // Arriving at a gated room *is* asking to come in. Previously this only
+      // set the waiting state: the guest saw "waiting for the host" while no
+      // request had been created and the host had nothing to approve, so both
+      // ends appeared broken. Sending it is idempotent, so a refresh while
+      // already pending is harmless.
+      const alreadyAsked = result.room.joinRequests?.some(
+        (request) =>
+          (typeof request.user === 'string' ? request.user : request.user?._id) ===
+            userIdRef.current && request.status === 'pending',
+      );
+
+      if (!alreadyAsked) {
+        try {
+          await roomApi.requestToJoin(roomId);
+        } catch (err) {
+          // A rejected requester cannot ask again; show why rather than
+          // leaving them on a waiting screen that will never resolve.
+          setError(errorMessage(err));
+          setPhase('denied');
+        }
+      }
     } catch (err) {
       setError(errorMessage(err));
       setPhase('error');
