@@ -240,6 +240,19 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     delete candidateQueue.current[socketId];
   }, []);
 
+  /**
+   * Which side of a pair opens the negotiation.
+   *
+   * Both ends now learn about each other from the same sources, so "the
+   * newcomer offers" is no longer enough to keep offers from crossing. A
+   * comparison of socket ids gives both sides the same answer without any
+   * coordination: exactly one of them initiates.
+   */
+  const shouldInitiate = useCallback(
+    (theirSocketId: string) => Boolean(socket?.id && socket.id > theirSocketId),
+    [socket],
+  );
+
   /** Offer to a peer, or queue them if we have nothing to offer yet. */
   const offerTo = useCallback(
     async (peer: PeerAddress) => {
@@ -307,6 +320,31 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     offersToAnswer.forEach((offer) => void answerOffer(offer));
   }, [mediaSettled, offerTo, answerOffer]);
 
+  /**
+   * Ask the server who is already in the room.
+   *
+   * This hook mounts on the watch screen, but the room layout joins the socket
+   * room back on the lobby — so `existing-participants`, which the server emits
+   * once in reply to join-room, had already fired and gone before anything here
+   * was listening. Nobody offered, no connection was ever negotiated, and the
+   * call was silent while chat and playback worked normally.
+   */
+  useEffect(() => {
+    if (!socket || !connected || !enabled || !roomId || !mediaSettled) return;
+
+    let cancelled = false;
+    socket.emit('list-peers', roomId, (existing) => {
+      if (cancelled) return;
+      existing.forEach((peer) => {
+        if (shouldInitiate(peer.socketId)) void offerTo(peer);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [socket, connected, enabled, roomId, mediaSettled, offerTo, shouldInitiate]);
+
   /* ---------------------------------------------------------------------- */
   /* Signalling                                                             */
   /* ---------------------------------------------------------------------- */
@@ -314,16 +352,17 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
   useEffect(() => {
     if (!socket || !connected || !enabled || !roomId) return;
 
-    // The newcomer offers to everyone already in the room; occupants wait and
-    // answer. Exactly one side initiates per pair, which is what keeps offers
-    // from crossing.
     const handleExisting = (existing: PeerAddress[]) => {
-      existing.forEach((peer) => void offerTo(peer));
+      existing.forEach((peer) => {
+        if (shouldInitiate(peer.socketId)) void offerTo(peer);
+      });
     };
 
-    // Someone arrived after us. They will offer; we only need to be ready to
-    // answer, which the offer handler already is.
-    const handleUserConnected = () => {};
+    // Someone arrived while we were already here. The socket-id comparison
+    // decides which of us opens the negotiation.
+    const handleUserConnected = (peer: PeerAddress) => {
+      if (shouldInitiate(peer.socketId)) void offerTo(peer);
+    };
 
     const handleOffer = (payload: PendingOffer) => void answerOffer(payload);
 
@@ -380,7 +419,17 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       socket.off('ice-candidate', handleCandidate);
       socket.off('user-disconnected', handleDisconnected);
     };
-  }, [socket, connected, enabled, roomId, offerTo, answerOffer, closePeer, drainCandidates]);
+  }, [
+    socket,
+    connected,
+    enabled,
+    roomId,
+    offerTo,
+    answerOffer,
+    closePeer,
+    drainCandidates,
+    shouldInitiate,
+  ]);
 
   // Tear every connection down when the room or the feature is switched off.
   useEffect(() => {

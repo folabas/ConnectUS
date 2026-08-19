@@ -179,6 +179,38 @@ export function registerSocketHandlers(io: Server) {
             }
         });
 
+        /**
+         * Who else is in my room?
+         *
+         * `existing-participants` is emitted once, in response to join-room.
+         * The room layout joins as soon as the lobby opens, but the WebRTC
+         * hook only mounts on the watch screen — so that event had always
+         * fired and gone before anything was listening for it, and no peer
+         * ever offered. This lets a client ask at the moment it is ready.
+         */
+        socket.on(
+            'list-peers',
+            async (
+                roomId: string,
+                ack?: (peers: { socketId: string; userId: string }[]) => void,
+            ) => {
+                if (!ack) return;
+                if (appSocket.data.currentRoom !== roomId) {
+                    ack([]);
+                    return;
+                }
+                const sockets = await io.in(roomId).fetchSockets();
+                ack(
+                    sockets
+                        .filter((s) => s.id !== socket.id)
+                        .map((s) => ({
+                            socketId: s.id,
+                            userId: (s.data as SocketData).userId,
+                        })),
+                );
+            },
+        );
+
         socket.on('leave-room', async (roomId: string) => {
             if (appSocket.data.currentRoom !== roomId) return;
             socket.leave(roomId);

@@ -188,6 +188,55 @@ async function main() {
     );
 
     say('');
+    say('Peer discovery after joining');
+    say('----------------------------');
+
+    // The watch screen mounts long after the layout joined the socket room, so
+    // the one-shot existing-participants has already been and gone. This is the
+    // path that has to work, and it is the one that was missing entirely.
+    const hostSees = await new Promise<any>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 4000);
+        hostSocket.emit('list-peers', room._id, (peers: any) => {
+            clearTimeout(timer);
+            resolve(peers);
+        });
+    });
+
+    check(
+        'a client can ask who is in the room after it has already joined',
+        Array.isArray(hostSees) && hostSees.length === 1,
+        JSON.stringify(hostSees),
+    );
+    check(
+        'the answer carries both socket id and user id',
+        Boolean(hostSees?.[0]?.socketId && hostSees?.[0]?.userId === guest.userId),
+        JSON.stringify(hostSees?.[0]),
+    );
+
+    const guestSees = await new Promise<any>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 4000);
+        guestSocket.emit('list-peers', room._id, (peers: any) => {
+            clearTimeout(timer);
+            resolve(peers);
+        });
+    });
+
+    check(
+        'each side sees the other, and not itself',
+        guestSees?.length === 1 && guestSees[0].userId === host.userId,
+        JSON.stringify(guestSees),
+    );
+
+    // Exactly one of the pair must open the negotiation, or the offers cross.
+    const hostInitiates = hostSocket.id! > guestSocket.id!;
+    const guestInitiates = guestSocket.id! > hostSocket.id!;
+    check(
+        'the socket-id rule picks exactly one initiator',
+        hostInitiates !== guestInitiates,
+        `host=${hostInitiates} guest=${guestInitiates}`,
+    );
+
+    say('');
     say('Late-joiner playback');
     say('--------------------');
 

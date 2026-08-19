@@ -101,6 +101,8 @@ export interface ServerEvents {
 export interface ClientEvents {
   'join-room': (roomId: string, ack?: (result: { ok: boolean; error?: string }) => void) => void;
   'leave-room': (roomId: string) => void;
+  /** Ask who else is in the room, for clients that mount after joining. */
+  'list-peers': (roomId: string, ack: (peers: PeerPayload[]) => void) => void;
 
   offer: (payload: { targetSocketId: string; sdp: RTCSessionDescriptionInit }) => void;
   answer: (payload: { targetSocketId: string; sdp: RTCSessionDescriptionInit }) => void;
