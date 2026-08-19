@@ -586,6 +586,51 @@ describe('movie catalog safety', () => {
         expect(await Movie.findById(existing._id)).not.toBeNull();
     });
 
+    it('removes the dead sample-bucket entries', async () => {
+        // The old seed pointed at commondatastorage.googleapis.com, which now
+        // 403s, so every one of those titles was a broken play button.
+        const user = await registerUser(api);
+        const { Movie } = await import('../src/models/Movie');
+
+        await Movie.create({
+            title: 'Quantum Horizon',
+            image: 'https://example.test/poster.jpg',
+            duration: '2h 15m',
+            rating: '8.5',
+            genre: 'Sci-Fi',
+            videoUrl:
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        });
+
+        await api('/api/movies/seed', { method: 'POST', token: user.token });
+
+        expect(await Movie.findOne({ title: 'Quantum Horizon' })).toBeNull();
+    });
+
+    it('leaves user-added films alone while clearing dead ones', async () => {
+        const user = await registerUser(api);
+        const { Movie } = await import('../src/models/Movie');
+        const mine = await seedMovie();
+
+        await api('/api/movies/seed', { method: 'POST', token: user.token });
+
+        expect(await Movie.findById(mine._id)).not.toBeNull();
+    });
+
+    it('seeds real archive titles with playable urls', async () => {
+        const user = await registerUser(api);
+        await api('/api/movies/seed', { method: 'POST', token: user.token });
+
+        const { Movie } = await import('../src/models/Movie');
+        const seeded = await Movie.find({ source: 'archive' });
+
+        expect(seeded.length).toBeGreaterThanOrEqual(6);
+        seeded.forEach((movie) => {
+            expect(movie.videoUrl).toContain('archive.org');
+            expect(movie.archiveId).toBeTruthy();
+        });
+    });
+
     it('is idempotent across repeated runs', async () => {
         const user = await registerUser(api);
 

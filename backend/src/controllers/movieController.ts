@@ -4,77 +4,114 @@ import { createDirectUpload, getAssetDetails, formatDuration, getUploadDetails }
 import { AuthRequest } from '../middleware/auth';
 import { searchPlayable, resolveCached } from '../services/archiveService';
 
-// Initial movie data for seeding
+/**
+ * The starter catalogue.
+ *
+ * Six real public-domain films, every one resolved from the Internet Archive
+ * and confirmed to serve an HTTP range request — which is what the player needs
+ * in order to seek — by scripts/find-seed-films.ts.
+ *
+ * What this replaced: six invented titles (Quantum Horizon, Dark Velocity and
+ * friends) with fabricated ratings and synopses, all pointing at Google's
+ * sample bucket. Four of the six were fifteen-second Chromecast adverts rather
+ * than films, and the bucket now returns 403 outright, so a new user's very
+ * first click was a dead link dressed up as a feature.
+ *
+ * Titles and years are curated rather than taken from the archive, whose
+ * metadata is uploader-supplied and arrives as things like "Carnival of Souls
+ * ( iPod Video Version )". The identifiers and URLs are exactly as verified.
+ */
 const initialMovies = [
     {
-        title: 'Quantum Horizon',
-        image: 'https://images.unsplash.com/photo-1655367574486-f63675dd69eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGNpbmVtYXxlbnwxfHx8fDE3NjMzODE5NTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-        duration: '2h 15m',
-        rating: '8.5',
-        genre: 'Sci-Fi',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-        muxPlaybackId: '36q401a684q7k960015d8000', // Sample Mux Asset
-        description: 'A journey through the quantum realm where reality bends and time dissolves.',
-        year: 2025,
-        source: 'blender'
+        title: 'Nosferatu',
+        image: 'https://archive.org/services/img/Nosferatu1922',
+        duration: '1h 32m',
+        rating: 'N/A',
+        genre: 'Horror',
+        videoUrl: 'https://archive.org/download/Nosferatu1922/Nosferatu.mp4',
+        archiveId: 'Nosferatu1922',
+        source: 'archive' as const,
+        description:
+            "Murnau's unauthorised Dracula, and the film that taught cinema what a shadow could do. German Expressionism at its most unsettling.",
+        year: 1922,
     },
     {
-        title: 'Dark Velocity',
-        image: 'https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhY3Rpb24lMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NjMzNDU0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-        duration: '2h 05m',
-        rating: '8.2',
-        genre: 'Action',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-        muxPlaybackId: '36q401a684q7k960015d8000', // Using same sample for demo
-        description: 'High-octane action in a futuristic metropolis where speed is the only currency.',
-        year: 2025,
-        source: 'blender'
+        title: 'Night of the Living Dead',
+        image: 'https://archive.org/services/img/night-of-the-living-dead-1968',
+        duration: '1h 36m',
+        rating: 'N/A',
+        genre: 'Horror',
+        videoUrl:
+            'https://archive.org/download/night-of-the-living-dead-1968/Night%20of%20the%20Living%20Dead%20(1968).mp4',
+        archiveId: 'night-of-the-living-dead-1968',
+        source: 'archive' as const,
+        description:
+            'Romero invented the modern zombie here, then lost the copyright to a missing notice on the title card — which is why it is free to watch at all.',
+        year: 1968,
     },
     {
-        title: 'Nebula Dreams',
-        image: 'https://images.unsplash.com/photo-1661115111405-981a08256178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2lmaSUyMG1vdmllJTIwcG9zdGVyfGVufDF8fHx8MTc2MzQyMTgwOXww&ixlib=rb-4.1.0&q=80&w=1080',
-        duration: '1h 58m',
-        rating: '8.8',
-        genre: 'Sci-Fi',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-        description: 'An astronaut discovers a sentient nebula that communicates through dreams.',
-        year: 2025,
-        source: 'blender'
-    },
-    {
-        title: 'Silent Echo',
-        image: 'https://images.unsplash.com/photo-1655367574486-f63675dd69eb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3ZpZSUyMHBvc3RlciUyMGNpbmVtYXxlbnwxfHx8fDE3NjMzODE5NTd8MA&ixlib=rb-4.1.0&q=80&w=1080',
-        duration: '2h 10m',
-        rating: '8.4',
-        genre: 'Drama',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-        description: 'A powerful drama about a musician who loses their hearing but finds a new voice.',
-        year: 2024,
-        source: 'blender'
-    },
-    {
-        title: 'The Last Circuit',
-        image: 'https://images.unsplash.com/photo-1762356121454-877acbd554bb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhY3Rpb24lMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NjMzNDU0MDZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-        duration: '2h 22m',
-        rating: '8.6',
-        genre: 'Thriller',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-        description: 'A hacker uncovers a conspiracy that threatens to shut down the global grid.',
-        year: 2025,
-        source: 'blender'
-    },
-    {
-        title: 'Cosmic Laughter',
-        image: 'https://images.unsplash.com/photo-1587042285747-583b4d4d73b7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb21lZHklMjBtb3ZpZSUyMHBvc3RlcnxlbnwxfHx8fDE3NjMzNDU3NzR8MA&ixlib=rb-4.1.0&q=80&w=1080',
-        duration: '1h 45m',
-        rating: '7.9',
+        title: 'His Girl Friday',
+        image: 'https://archive.org/services/img/HisGirlFriday1940',
+        duration: '1h 33m',
+        rating: 'N/A',
         genre: 'Comedy',
-        videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
-        description: 'Aliens land on Earth, but they just want to perform stand-up comedy.',
-        year: 2024,
-        source: 'blender'
-    }
+        videoUrl: 'https://archive.org/download/HisGirlFriday1940/seqhisgirlfridayfull1d_512kb.mp4',
+        archiveId: 'HisGirlFriday1940',
+        source: 'archive' as const,
+        description:
+            'Newspaper screwball with dialogue so fast the cast talk over each other on purpose. Cary Grant and Rosalind Russell at full tilt.',
+        year: 1940,
+    },
+    {
+        title: 'Carnival of Souls',
+        image: 'https://archive.org/services/img/carnival_of_souls',
+        duration: '1h 23m',
+        rating: 'N/A',
+        genre: 'Horror',
+        videoUrl: 'https://archive.org/download/carnival_of_souls/carnival_of_souls_512kb.mp4',
+        archiveId: 'carnival_of_souls',
+        source: 'archive' as const,
+        description:
+            'A church organist survives a crash and finds herself drawn to an abandoned pavilion. Made for almost nothing, and quietly terrifying.',
+        year: 1962,
+    },
+    {
+        title: 'Detour',
+        image: 'https://archive.org/services/img/detour_1945',
+        duration: '1h 9m',
+        rating: 'N/A',
+        genre: 'Drama',
+        videoUrl: 'https://archive.org/download/detour_1945/detour_4k.mp4',
+        archiveId: 'detour_1945',
+        source: 'archive' as const,
+        description:
+            'Film noir stripped to the bone: a hitchhiker, a dead man and a series of decisions that only make things worse. Shot in six days.',
+        year: 1945,
+    },
+    {
+        title: 'The General',
+        image: 'https://archive.org/services/img/TheGeneral1926',
+        duration: '1h 19m',
+        rating: 'N/A',
+        genre: 'Comedy',
+        videoUrl: 'https://archive.org/download/TheGeneral1926/The_General_1926_720p_512kb.mp4',
+        archiveId: 'TheGeneral1926',
+        source: 'archive' as const,
+        description:
+            'Buster Keaton chases a stolen locomotive through the Civil War, performing his own stunts on a moving train because of course he did.',
+        year: 1926,
+    },
 ];
+
+/**
+ * Titles from the old seed that pointed at Google's sample bucket.
+ *
+ * They are removed on seed rather than left in place: the bucket returns 403,
+ * so each one is a broken play button, and they claimed runtimes of two hours
+ * for what were fifteen-second adverts. Matched on the exact videoUrl host so
+ * nothing a user added themselves is ever touched.
+ */
+const DEAD_SAMPLE_HOST = 'commondatastorage.googleapis.com';
 
 // GET /api/movies
 export const getMovies = async (req: Request, res: Response): Promise<void> => {
@@ -150,10 +187,16 @@ export const seedMovies = async (req: Request, res: Response): Promise<void> => 
         // than a valid login, so any registered account could empty the entire
         // catalog. It is now additive and idempotent: existing titles are left
         // alone and only missing ones are inserted.
+        // Remove the old sample-bucket entries. Their host 403s, so every one
+        // of them is a broken play button; anything a user added is untouched.
+        const removed = await Movie.deleteMany({
+            videoUrl: { $regex: DEAD_SAMPLE_HOST },
+        });
+
         const results = await Promise.all(
             initialMovies.map((movie) =>
                 Movie.updateOne(
-                    { title: movie.title },
+                    { archiveId: movie.archiveId },
                     { $setOnInsert: movie },
                     { upsert: true }
                 )
@@ -164,7 +207,10 @@ export const seedMovies = async (req: Request, res: Response): Promise<void> => 
 
         res.status(201).json({
             success: true,
-            message: `Seed complete: ${inserted} added, ${initialMovies.length - inserted} already present`,
+            message:
+                `Seed complete: ${inserted} added, ` +
+                `${initialMovies.length - inserted} already present, ` +
+                `${removed.deletedCount} dead sample entries removed`,
             count: inserted,
         });
     } catch (error: any) {
