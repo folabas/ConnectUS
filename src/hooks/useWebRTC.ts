@@ -232,6 +232,10 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
         trace('ice state for', userId, '->', pc.iceConnectionState);
       };
 
+      pc.onsignalingstatechange = () => {
+        trace('signaling state for', userId, '->', pc.signalingState);
+      };
+
       pc.onicecandidate = (event) => {
         if (!event.candidate) trace('ice gathering complete for', userId);
         if (event.candidate && socket) {
@@ -337,6 +341,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       // senderUserId used to be the placeholder string 'peer'. ParticipantStrip
       // looks streams up by user id, so nothing matched and every remote peer
       // rendered as "camera off" on the receiving side.
+      trace('offer received from', senderUserId);
       const pc = createConnection(senderSocketId, senderUserId);
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -382,7 +387,12 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     if (!socket || !connected || !enabled || !roomId || !mediaSettled) return;
 
     let cancelled = false;
-    trace('asking who is in the room; my socket is', socket.id);
+    // Tell the room we can answer now. Whoever should initiate towards us will
+    // do so on hearing this, which is the half that was missing: we were
+    // discoverable but nobody knew we had started listening.
+    trace('announcing readiness; my socket is', socket.id);
+    socket.emit('peer-ready', roomId);
+
     socket.emit('list-peers', roomId, (existing) => {
       if (cancelled) return;
       trace('peers in room:', existing.length, existing.map((p) => p.userId));
@@ -411,10 +421,10 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       });
     };
 
-    // Someone arrived while we were already here. The socket-id comparison
-    // decides which of us opens the negotiation.
+    // Deliberately does not offer: the socket has joined the room but its
+    // WebRTC layer may not be mounted yet. We wait for peer-ready instead.
     const handleUserConnected = (peer: PeerAddress) => {
-      if (shouldInitiate(peer.socketId)) void offerTo(peer);
+      trace('socket joined the room (not yet ready):', peer.userId);
     };
 
     const handleOffer = (payload: PendingOffer) => void answerOffer(payload);
@@ -426,12 +436,18 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       senderSocketId: string;
       sdp: RTCSessionDescriptionInit;
     }) => {
+      trace('answer received from socket', senderSocketId);
       const pc = connections.current[senderSocketId];
-      if (!pc) return;
+      if (!pc) {
+        trace('no connection for that answer — dropped');
+        return;
+      }
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
         await drainCandidates(senderSocketId, pc);
-      } catch {
+        trace('remote description set; negotiation complete');
+      } catch (error) {
+        trace('failed to apply answer:', (error as Error).message);
         closePeer(senderSocketId);
       }
     };
@@ -455,10 +471,32 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       }
     };
 
+    /**
+     * A peer has just become able to answer.
+     *
+     * Any connection we already hold for them was negotiated while they were
+     * not listening — its offer went nowhere — so it is discarded and a fresh
+     * one is made. This is what recovers the deadlock where the offer was sent
+     * during their lobby and each side then waited for the other.
+     */
+    const handlePeerReady = (peer: PeerAddress) => {
+      trace('peer is ready:', peer.userId);
+      if (!shouldInitiate(peer.socketId)) {
+        trace('waiting for', peer.userId, 'to offer');
+        return;
+      }
+      if (connections.current[peer.socketId]) {
+        trace('replacing stale connection to', peer.userId);
+        closePeer(peer.socketId);
+      }
+      void offerTo(peer);
+    };
+
     const handleDisconnected = ({ socketId }: { socketId: string }) => closePeer(socketId);
 
     socket.on('existing-participants', handleExisting);
     socket.on('user-connected', handleUserConnected);
+    socket.on('peer-ready', handlePeerReady);
     socket.on('offer', handleOffer);
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleCandidate);
@@ -467,6 +505,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     return () => {
       socket.off('existing-participants', handleExisting);
       socket.off('user-connected', handleUserConnected);
+      socket.off('peer-ready', handlePeerReady);
       socket.off('offer', handleOffer);
       socket.off('answer', handleAnswer);
       socket.off('ice-candidate', handleCandidate);

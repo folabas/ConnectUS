@@ -237,6 +237,39 @@ async function main() {
     );
 
     say('');
+    say('Readiness handshake');
+    say('-------------------');
+
+    // The offer must wait for the peer to say it can answer. Announcing on
+    // join-room raced the watch screen mounting, and the offer was lost.
+    const hostSawReady = waitFor(hostSocket, 'peer-ready', 4000);
+    guestSocket.emit('peer-ready', room._id);
+    const ready = await hostSawReady;
+
+    check(
+        'peer-ready reaches the other side of the room',
+        Boolean(ready),
+        JSON.stringify(ready),
+    );
+    check(
+        'it identifies who is ready, by socket and user',
+        ready?.socketId === guestSocket.id && ready?.userId === guest.userId,
+        JSON.stringify(ready),
+    );
+
+    // It must not echo back to the announcer, or a client would try to offer
+    // to itself.
+    const echoed = await new Promise<any>((resolve) => {
+        const timer = setTimeout(() => resolve(null), 1200);
+        guestSocket.once('peer-ready', (p: any) => {
+            clearTimeout(timer);
+            resolve(p);
+        });
+        guestSocket.emit('peer-ready', room._id);
+    });
+    check('it does not echo back to the sender', echoed === null, JSON.stringify(echoed));
+
+    say('');
     say('Late-joiner playback');
     say('--------------------');
 

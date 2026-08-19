@@ -211,6 +211,42 @@ export function registerSocketHandlers(io: Server) {
             },
         );
 
+        /**
+         * "My WebRTC layer is mounted and listening."
+         *
+         * Joining a room and being ready to negotiate are different moments.
+         * The room layout joins on the lobby; the peer connection code only
+         * mounts on the watch screen. An offer sent on `user-connected` — which
+         * fires at join time — therefore arrived while the recipient had no
+         * offer listener, and was dropped. The recipient then waited for an
+         * offer that had already come and gone, and neither side ever spoke
+         * again.
+         *
+         * Announcing readiness lets whichever side should initiate do so at a
+         * moment the other is certain to hear it.
+         */
+        socket.on('peer-ready', (roomId: string) => {
+            if (appSocket.data.currentRoom !== roomId) return;
+            socket.to(roomId).emit('peer-ready', { socketId: socket.id, userId });
+        });
+
+        /**
+         * "My WebRTC layer is listening now."
+         *
+         * user-connected fires when a socket joins the room, which happens in
+         * the room layout — well before the watch screen has mounted and
+         * registered an offer handler. An offer sent on that signal arrived at
+         * a client that was not listening yet and was simply lost, and since
+         * only one side of a pair initiates, nothing ever retried.
+         *
+         * This is emitted by the peer itself once it is genuinely ready to
+         * answer, so the offer cannot outrun the handler.
+         */
+        socket.on('peer-ready', (roomId: string) => {
+            if (appSocket.data.currentRoom !== roomId) return;
+            socket.to(roomId).emit('peer-ready', { roomId, socketId: socket.id, userId });
+        });
+
         socket.on('leave-room', async (roomId: string) => {
             if (appSocket.data.currentRoom !== roomId) return;
             socket.leave(roomId);

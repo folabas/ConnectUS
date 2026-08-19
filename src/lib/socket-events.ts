@@ -49,7 +49,10 @@ export interface ServerEvents {
 
   'existing-participants': (peers: PeerPayload[]) => void;
   'user-connected': (peer: PeerPayload) => void;
+  /** A peer's WebRTC layer is mounted and ready to answer an offer. */
+  'peer-ready': (peer: PeerPayload & { roomId: string }) => void;
   'user-disconnected': (peer: PeerPayload) => void;
+  /** A peer's WebRTC layer has mounted and is listening for offers. */
   'user-left': (payload: { userId: string; userName: string }) => void;
 
   // senderUserId is what lets the receiver attach an incoming stream to a
@@ -103,6 +106,9 @@ export interface ClientEvents {
   'leave-room': (roomId: string) => void;
   /** Ask who else is in the room, for clients that mount after joining. */
   'list-peers': (roomId: string, ack: (peers: PeerPayload[]) => void) => void;
+  /** Announce that this client can now answer offers. */
+  'peer-ready': (roomId: string) => void;
+  /** Announce that this client is now able to answer an offer. */
 
   offer: (payload: { targetSocketId: string; sdp: RTCSessionDescriptionInit }) => void;
   answer: (payload: { targetSocketId: string; sdp: RTCSessionDescriptionInit }) => void;
