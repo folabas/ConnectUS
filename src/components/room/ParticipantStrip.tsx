@@ -37,14 +37,35 @@ export function ParticipantStrip({
   localStream: MediaStream | null;
   currentUserId?: string;
 }) {
-  const streamBySocket = new Map(peers.map((peer) => [peer.userId, peer.stream]));
+  // Keyed by user id, because that is what a participant row knows about
+  // itself. The connection is kept alongside the stream so the tile can say
+  // *why* there is no picture.
+  const peerByUser = new Map(peers.map((peer) => [peer.userId, peer]));
 
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
       {room.participants.map((participant) => {
         const isMe = participant._id === currentUserId;
-        const stream = isMe ? localStream : streamBySocket.get(participant._id);
+        const peer = isMe ? null : peerByUser.get(participant._id);
+        const stream = isMe ? localStream : (peer?.stream ?? null);
         const isRoomHost = participant._id === room.host?._id;
+
+        // "Camera off" was shown for every case with no picture, which made a
+        // failed connection indistinguishable from someone who had simply
+        // turned their camera off. These are very different problems.
+        const status = isMe
+          ? localStream
+            ? null
+            : 'No camera'
+          : !peer
+            ? 'Not connected'
+            : peer.stream
+              ? null
+              : peer.state === 'failed'
+                ? 'Connection failed'
+                : peer.state === 'connected'
+                  ? 'Connected, no video'
+                  : 'Connecting…';
 
         return (
           <div
@@ -66,7 +87,7 @@ export function ParticipantStrip({
                 </Avatar>
                 <span className="flex items-center gap-1.5 text-xs text-white/40">
                   <VideoOff className="h-3 w-3" />
-                  Camera off
+                  {status ?? 'Camera off'}
                 </span>
               </div>
             )}

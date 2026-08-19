@@ -29,7 +29,18 @@ import { webrtcApi } from '@/lib/api';
 export interface Peer {
   userId: string;
   socketId: string;
-  stream: MediaStream;
+  /** Null until their media actually arrives. */
+  stream: MediaStream | null;
+  /**
+   * Live connection state.
+   *
+   * A peer is recorded as soon as negotiation begins rather than when the first
+   * track lands, so the UI can tell "connecting" apart from "nothing is
+   * happening" — which previously both rendered as "Camera off", and made a
+   * total signalling failure look like the other person had simply switched
+   * their camera off.
+   */
+  state: RTCPeerConnectionState;
 }
 
 interface PeerAddress {
@@ -58,6 +69,17 @@ const FALLBACK_ICE: RTCConfiguration = {
 };
 
 export type MediaError = 'denied' | 'not-found' | 'unsupported' | null;
+
+/**
+ * Signalling trace.
+ *
+ * A call that fails silently gives you nothing to go on: no error, no console
+ * output, just two black tiles. Every step of the negotiation is logged with a
+ * single prefix so the whole exchange can be read off the console and compared
+ * between the two peers — which is the only way to tell "I never offered" apart
+ * from "I offered and they never answered".
+ */
+const trace = (...args: unknown[]) => console.info('[webrtc]', ...args);
 
 export function useWebRTC(roomId: string | null, enabled: boolean) {
   const { socket, connected } = useSocket();
@@ -156,6 +178,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
         // the film, chat, reactions, and everyone else's video.
         setMediaError(name === 'NotFoundError' ? 'not-found' : 'denied');
       } finally {
+        trace('media settled - tracks:', localStreamRef.current?.getTracks().length ?? 0);
         settle();
       }
     };
@@ -192,12 +215,25 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
 
       const pc = new RTCPeerConnection(iceConfig.current);
       connections.current[socketId] = pc;
+      trace('connection created for', userId, 'socket', socketId, 'ice servers:',
+        iceConfig.current.iceServers?.length ?? 0);
+
+      setPeers((current) =>
+        current.some((peer) => peer.socketId === socketId)
+          ? current
+          : [...current, { socketId, userId, stream: null, state: pc.connectionState }],
+      );
 
       localStreamRef.current
         ?.getTracks()
         .forEach((track) => pc.addTrack(track, localStreamRef.current!));
 
+      pc.oniceconnectionstatechange = () => {
+        trace('ice state for', userId, '->', pc.iceConnectionState);
+      };
+
       pc.onicecandidate = (event) => {
+        if (!event.candidate) trace('ice gathering complete for', userId);
         if (event.candidate && socket) {
           socket.emit('ice-candidate', {
             targetSocketId: socketId,
@@ -208,17 +244,26 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
 
       pc.ontrack = (event) => {
         const [stream] = event.streams;
+        trace('track received from', userId, 'kind', event.track?.kind, 'streams', event.streams.length);
         if (!stream) return;
-        setPeers((current) => {
-          const without = current.filter((peer) => peer.socketId !== socketId);
-          return [...without, { socketId, userId, stream }];
-        });
+        setPeers((current) =>
+          current.map((peer) =>
+            peer.socketId === socketId ? { ...peer, stream, state: pc.connectionState } : peer,
+          ),
+        );
       };
 
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-          closePeer(socketId);
-        }
+        trace('connection state for', userId, '->', pc.connectionState);
+        setPeers((current) =>
+          current.map((peer) =>
+            peer.socketId === socketId ? { ...peer, state: pc.connectionState } : peer,
+          ),
+        );
+
+        // 'failed' is kept visible so the tile can say so. 'closed' means the
+        // peer is genuinely gone.
+        if (pc.connectionState === 'closed') closePeer(socketId);
       };
 
       return pc;
@@ -267,6 +312,8 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
+        trace('sending offer to', peer.userId, '- local tracks:',
+          localStreamRef.current?.getTracks().length ?? 0);
         socket.emit('offer', { targetSocketId: peer.socketId, sdp: offer });
       } catch {
         closePeer(peer.socketId);
@@ -296,6 +343,8 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
         await drainCandidates(senderSocketId, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
+        trace('answering', senderUserId, '- local tracks:',
+          localStreamRef.current?.getTracks().length ?? 0);
         socket.emit('answer', { targetSocketId: senderSocketId, sdp: answer });
       } catch {
         closePeer(senderSocketId);
@@ -333,10 +382,14 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     if (!socket || !connected || !enabled || !roomId || !mediaSettled) return;
 
     let cancelled = false;
+    trace('asking who is in the room; my socket is', socket.id);
     socket.emit('list-peers', roomId, (existing) => {
       if (cancelled) return;
+      trace('peers in room:', existing.length, existing.map((p) => p.userId));
       existing.forEach((peer) => {
-        if (shouldInitiate(peer.socketId)) void offerTo(peer);
+        const mine = shouldInitiate(peer.socketId);
+        trace(mine ? 'I will offer to' : 'they will offer to me:', peer.userId);
+        if (mine) void offerTo(peer);
       });
     });
 
