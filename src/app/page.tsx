@@ -17,8 +17,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/brand/Logo';
 import { Reveal, RevealGroup } from '@/components/landing/Reveal';
-import { SyncVisual } from '@/components/landing/SyncVisual';
+import { WatchRoomVisual } from '@/components/landing/WatchRoomVisual';
 import { FilmReel } from '@/components/landing/FilmReel';
+import {
+  StepOneVisual,
+  StepTwoVisual,
+  StepThreeVisual,
+} from '@/components/landing/StepVisual';
 import { useAuth } from '@/providers/AuthProvider';
 import { EASE } from '@/lib/motion';
 import { cn, focusRing } from '@/lib/ui';
@@ -70,16 +75,19 @@ const STEPS = [
     n: '01',
     title: 'Choose the film',
     body: 'Search thousands of public-domain titles from inside the app and add one to your library in a click.',
+    Visual: StepOneVisual,
   },
   {
     n: '02',
     title: 'Open the room',
     body: 'Name it, decide who gets in, and share the six-character code. Everyone gathers in the lobby first.',
+    Visual: StepTwoVisual,
   },
   {
     n: '03',
     title: 'Press play once',
     body: 'One press and every screen lands on the same frame. You hold the remote for the rest of the night.',
+    Visual: StepThreeVisual,
   },
 ];
 
@@ -197,7 +205,7 @@ export default function LandingPage() {
           />
 
           <div className="relative mx-auto max-w-6xl">
-            <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_1fr] lg:gap-10">
+            <div className="grid items-center gap-12 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
               <div>
                 <motion.p
                   initial={reduced ? false : { opacity: 0, y: 12 }}
@@ -266,7 +274,7 @@ export default function LandingPage() {
                 </motion.p>
               </div>
 
-              <SyncVisual />
+              <WatchRoomVisual />
             </div>
           </div>
         </section>
@@ -318,18 +326,47 @@ export default function LandingPage() {
               </h2>
             </Reveal>
 
-            <RevealGroup className="mt-14 grid gap-12 sm:grid-cols-3 sm:gap-8">
-              {STEPS.map((step) => (
-                <Reveal key={step.n}>
-                  <div className="flex items-baseline gap-4">
-                    <span className="font-mono text-sm text-[var(--brand-soft)]">{step.n}</span>
-                    <span className="h-px flex-1 bg-white/10" />
-                  </div>
-                  <h3 className="mt-5 text-xl tracking-[-0.01em]">{step.title}</h3>
-                  <p className="mt-2.5 leading-relaxed text-white/50">{step.body}</p>
-                </Reveal>
-              ))}
-            </RevealGroup>
+            <div className="mt-14 flex flex-col gap-20 sm:gap-24">
+              {STEPS.map((step, index) => {
+                const isEven = index % 2 === 0;
+                return (
+                  <Reveal key={step.n}>
+                    <div
+                      className={cn(
+                        'grid items-center gap-10 lg:grid-cols-[1fr_1fr] lg:gap-16',
+                        !isEven && 'lg:[direction:rtl]',
+                      )}
+                    >
+                      {/* Text side */}
+                      <div className={cn(!isEven && 'lg:[direction:ltr]')}>
+                        <div className="mb-5 flex items-center gap-3">
+                          <span className="font-mono text-sm text-[var(--brand-soft)]">
+                            {step.n}
+                          </span>
+                          <span className="h-px w-10 bg-white/10" />
+                        </div>
+                        <h3 className="text-2xl tracking-[-0.02em] sm:text-3xl">
+                          {step.title}
+                        </h3>
+                        <p className="mt-3 max-w-sm leading-relaxed text-white/50">
+                          {step.body}
+                        </p>
+                      </div>
+
+                      {/* Visual side */}
+                      <div
+                        className={cn(
+                          'rounded-2xl border border-white/[0.07] bg-[var(--bg)]/60 p-5 backdrop-blur-sm sm:p-7',
+                          !isEven && 'lg:[direction:ltr]',
+                        )}
+                      >
+                        <step.Visual />
+                      </div>
+                    </div>
+                  </Reveal>
+                );
+              })}
+            </div>
           </div>
         </section>
 
