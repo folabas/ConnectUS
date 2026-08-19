@@ -197,7 +197,15 @@ export function registerSocketHandlers(io: Server) {
                 // Only relay between sockets that share a room.
                 const room = appSocket.data.currentRoom;
                 if (!room) return;
-                io.to(target).emit(event, { ...payload, senderSocketId: socket.id });
+                // senderUserId matters as much as the socket id: the receiving
+                // client has to attach the incoming stream to a participant, and
+                // a socket id alone tells it nothing about who that is. Without
+                // this the receiver labelled every remote peer "camera off".
+                io.to(target).emit(event, {
+                    ...payload,
+                    senderSocketId: socket.id,
+                    senderUserId: userId,
+                });
             });
 
         relay('offer');
@@ -302,7 +310,12 @@ export function registerSocketHandlers(io: Server) {
 
         socket.on(
             'video-sync-response',
-            (payload: { roomId?: string; targetSocketId?: string; currentTime?: number }) => {
+            (payload: {
+                roomId?: string;
+                targetSocketId?: string;
+                currentTime?: number;
+                paused?: boolean;
+            }) => {
                 const { roomId, targetSocketId } = payload ?? {};
                 if (!roomId || !targetSocketId) return;
                 if (appSocket.data.currentRoom !== roomId) return;
@@ -312,6 +325,10 @@ export function registerSocketHandlers(io: Server) {
                     roomId,
                     targetSocketId,
                     currentTime: Number(payload.currentTime) || 0,
+                    // A late joiner needs to know the film is *running*, not just
+                    // where it has got to. Without this they synced the position
+                    // and then sat on a paused frame.
+                    paused: Boolean(payload.paused),
                     emittedAt: Date.now(),
                 });
             },

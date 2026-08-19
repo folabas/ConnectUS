@@ -218,12 +218,17 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
 
     const handleOffer = async ({
       senderSocketId,
+      senderUserId,
       sdp,
     }: {
       senderSocketId: string;
+      senderUserId: string;
       sdp: RTCSessionDescriptionInit;
     }) => {
-      const pc = createConnection(senderSocketId, 'peer');
+      // Was `createConnection(senderSocketId, 'peer')` — a placeholder string.
+      // ParticipantStrip looks streams up by user id, so nothing ever matched
+      // and every remote peer rendered as "camera off" on the receiving side.
+      const pc = createConnection(senderSocketId, senderUserId);
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
         await drainCandidates(senderSocketId, pc);

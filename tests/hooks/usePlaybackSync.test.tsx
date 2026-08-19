@@ -73,11 +73,15 @@ function createVideo(overrides: Partial<HTMLVideoElement> = {}) {
 
 const ROOM_ID = 'room-1';
 
-function render(video: HTMLVideoElement, canControl: boolean) {
+function render(
+  video: HTMLVideoElement,
+  canControl: boolean,
+  onAutoplayBlocked?: (blocked: boolean) => void,
+) {
   const ref = createRef<HTMLVideoElement>();
   (ref as { current: HTMLVideoElement | null }).current = video;
   const result = renderHook(() =>
-    usePlaybackSync({ roomId: ROOM_ID, canControl, videoRef: ref }),
+    usePlaybackSync({ roomId: ROOM_ID, canControl, videoRef: ref, onAutoplayBlocked }),
   );
   return result;
 }
@@ -237,8 +241,8 @@ describe('usePlaybackSync', () => {
       );
     });
 
-    it('answers a sync request with its current position', () => {
-      const video = createVideo({ currentTime: 77 });
+    it('answers a sync request with its position and whether it is playing', () => {
+      const video = createVideo({ currentTime: 77, paused: false });
       render(video, true);
 
       act(() => {
@@ -252,6 +256,7 @@ describe('usePlaybackSync', () => {
         roomId: ROOM_ID,
         targetSocketId: 'socket-9',
         currentTime: 77,
+        paused: false,
       });
     });
 
@@ -272,5 +277,83 @@ describe('usePlaybackSync', () => {
     expect(socketStub.listenerCount('video-seek')).toBe(1);
     unmount();
     expect(socketStub.listenerCount('video-seek')).toBe(0);
+  });
+});
+
+describe('late joiners and autoplay', () => {
+  beforeEach(() => {
+    socketStub.emit.mockReset();
+  });
+
+  it('starts playing when the sync response says the room is running', async () => {
+    // The late joiner never receives the original video-play — it fired before
+    // they arrived — so the sync response is the only thing that can start them.
+    const video = createVideo({ currentTime: 0, paused: true });
+    render(video, false);
+
+    act(() => {
+      socketStub.deliver('video-sync-response', {
+        roomId: ROOM_ID,
+        currentTime: 300,
+        paused: false,
+        emittedAt: Date.now(),
+      });
+    });
+
+    expect(video.play).toHaveBeenCalled();
+    expect(video.currentTime).toBeCloseTo(300, 0);
+  });
+
+  it('stays paused when the room is paused', () => {
+    const video = createVideo({ currentTime: 0, paused: false });
+    render(video, false);
+
+    act(() => {
+      socketStub.deliver('video-sync-response', {
+        roomId: ROOM_ID,
+        currentTime: 300,
+        paused: true,
+        emittedAt: Date.now(),
+      });
+    });
+
+    expect(video.pause).toHaveBeenCalled();
+  });
+
+  it('reports a refused autoplay instead of swallowing it', async () => {
+    // Followers have no controls, so an unreported refusal leaves them stuck on
+    // a paused frame with no way to start the film.
+    const onBlocked = vi.fn();
+    const video = createVideo({ paused: true });
+    (video.play as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new DOMException('play() failed', 'NotAllowedError'),
+    );
+    render(video, false, onBlocked);
+
+    act(() => {
+      socketStub.deliver('video-play', {
+        roomId: ROOM_ID,
+        currentTime: 10,
+        emittedAt: Date.now(),
+      });
+    });
+
+    await vi.waitFor(() => expect(onBlocked).toHaveBeenCalledWith(true));
+  });
+
+  it('clears the blocked flag once playback actually starts', async () => {
+    const onBlocked = vi.fn();
+    const video = createVideo({ paused: true });
+    render(video, false, onBlocked);
+
+    act(() => {
+      socketStub.deliver('video-play', {
+        roomId: ROOM_ID,
+        currentTime: 10,
+        emittedAt: Date.now(),
+      });
+    });
+
+    await vi.waitFor(() => expect(onBlocked).toHaveBeenCalledWith(false));
   });
 });

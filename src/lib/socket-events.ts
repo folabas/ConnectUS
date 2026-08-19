@@ -46,10 +46,21 @@ export interface ServerEvents {
   'user-disconnected': (peer: PeerPayload) => void;
   'user-left': (payload: { userId: string; userName: string }) => void;
 
-  offer: (payload: { senderSocketId: string; sdp: RTCSessionDescriptionInit }) => void;
-  answer: (payload: { senderSocketId: string; sdp: RTCSessionDescriptionInit }) => void;
+  // senderUserId is what lets the receiver attach an incoming stream to a
+  // participant; a socket id alone identifies the connection, not the person.
+  offer: (payload: {
+    senderSocketId: string;
+    senderUserId: string;
+    sdp: RTCSessionDescriptionInit;
+  }) => void;
+  answer: (payload: {
+    senderSocketId: string;
+    senderUserId: string;
+    sdp: RTCSessionDescriptionInit;
+  }) => void;
   'ice-candidate': (payload: {
     senderSocketId: string;
+    senderUserId: string;
     candidate: RTCIceCandidateInit;
   }) => void;
 
@@ -60,7 +71,9 @@ export interface ServerEvents {
   'video-pause': (payload: VideoStatePayload) => void;
   'video-seek': (payload: VideoStatePayload) => void;
   'video-sync-request': (payload: { roomId: string; requesterSocketId: string }) => void;
-  'video-sync-response': (payload: VideoStatePayload & { targetSocketId: string }) => void;
+  'video-sync-response': (
+    payload: VideoStatePayload & { targetSocketId: string; paused: boolean },
+  ) => void;
 
   'join-request-received': (payload: JoinRequestPayload) => void;
   'join-request-approved': (payload: { roomId: string; room: Room }) => void;
@@ -101,6 +114,7 @@ export interface ClientEvents {
     roomId: string;
     targetSocketId: string;
     currentTime: number;
+    paused: boolean;
   }) => void;
 }
 

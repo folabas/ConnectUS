@@ -9,6 +9,7 @@ import {
   LogOut,
   Maximize,
   MessageSquare,
+  Play,
   Mic,
   MicOff,
   Users,
@@ -46,6 +47,7 @@ export default function WatchPage() {
     roomId: room?._id ?? '',
     canControl: Boolean(canControl),
     videoRef,
+    onAutoplayBlocked: setBlockedByAutoplay,
   });
 
   const {
@@ -197,12 +199,28 @@ export default function WatchPage() {
               </div>
             )}
 
+            {/* Browsers refuse to start audio-bearing media without a gesture.
+                Followers have no controls, so without this they are stranded on
+                a paused frame with no way to start the film. */}
             {blockedByAutoplay && (
               <button
-                onClick={() => void videoRef.current?.play()}
-                className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                onClick={() => {
+                  const video = videoRef.current;
+                  if (!video) return;
+                  video
+                    .play()
+                    .then(() => setBlockedByAutoplay(false))
+                    .catch(() => setBlockedByAutoplay(true));
+                }}
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm"
               >
-                <span className="rounded-xl bg-[var(--brand)] text-[var(--brand-ink)] px-6 py-3">Tap to join playback</span>
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--brand)]">
+                  <Play className="ml-1 h-7 w-7 fill-[var(--brand-ink)] text-[var(--brand-ink)]" />
+                </span>
+                <span className="text-sm text-white">Tap to join the session</span>
+                <span className="text-xs text-white/50">
+                  Your browser needs a tap before it will start playing
+                </span>
               </button>
             )}
           </div>

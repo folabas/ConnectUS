@@ -29,11 +29,31 @@ interface Options {
   /** This client drives playback (host, or a room with host control disabled). */
   canControl: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /**
+   * Called when the browser refuses to start playback without a gesture.
+   *
+   * Followers have no controls of their own, so a silently swallowed rejection
+   * left them staring at a paused frame with no way to start it. The caller
+   * uses this to put a tap target on screen.
+   */
+  onAutoplayBlocked?(blocked: boolean): void;
 }
 
-export function usePlaybackSync({ roomId, canControl, videoRef }: Options) {
+export function usePlaybackSync({
+  roomId,
+  canControl,
+  videoRef,
+  onAutoplayBlocked,
+}: Options) {
   const { socket } = useSocket();
   const applyingRemote = useRef(false);
+
+  // Held in a ref so the effects below do not resubscribe when the caller
+  // passes a fresh closure on every render.
+  const blockedRef = useRef(onAutoplayBlocked);
+  useEffect(() => {
+    blockedRef.current = onAutoplayBlocked;
+  });
 
   const suppressEcho = useCallback(() => {
     applyingRemote.current = true;
@@ -41,6 +61,24 @@ export function usePlaybackSync({ roomId, canControl, videoRef }: Options) {
       applyingRemote.current = false;
     }, ECHO_WINDOW_MS);
   }, []);
+
+  /**
+   * Start playback, reporting a refusal rather than swallowing it.
+   *
+   * Browsers block unmuted playback that no gesture asked for. Followers have
+   * no controls of their own, so a swallowed rejection stranded them on a
+   * paused frame with no way out.
+   */
+  const attemptPlay = useCallback(
+    (video: HTMLVideoElement) => {
+      suppressEcho();
+      video
+        .play()
+        .then(() => blockedRef.current?.(false))
+        .catch(() => blockedRef.current?.(true));
+    },
+    [suppressEcho],
+  );
 
   /** Seek, compensating for the time the message spent in flight. */
   const applyRemoteTime = useCallback(
@@ -68,12 +106,7 @@ export function usePlaybackSync({ roomId, canControl, videoRef }: Options) {
     const video = videoRef.current;
     if (!video) return;
     applyRemoteTime(payload.currentTime, payload.emittedAt, true);
-    if (video.paused) {
-      suppressEcho();
-      // Autoplay can be refused; the UI surfaces a tap-to-play prompt via the
-      // element's own paused state, so a rejection here is not an error path.
-      void video.play().catch(() => {});
-    }
+    if (video.paused) attemptPlay(video);
   });
 
   useSocketEvent('video-pause', (payload) => {
@@ -99,12 +132,25 @@ export function usePlaybackSync({ roomId, canControl, videoRef }: Options) {
       roomId,
       targetSocketId: payload.requesterSocketId,
       currentTime: video.currentTime,
+      paused: video.paused,
     });
   });
 
   useSocketEvent('video-sync-response', (payload) => {
     if (payload.roomId !== roomId) return;
-    applyRemoteTime(payload.currentTime, payload.emittedAt, !videoRef.current?.paused);
+    const video = videoRef.current;
+    if (!video) return;
+
+    applyRemoteTime(payload.currentTime, payload.emittedAt, !payload.paused);
+
+    // A late joiner never receives the original video-play — it fired before
+    // they arrived — so without this they synced the position and then sat on a
+    // paused frame indefinitely.
+    if (!payload.paused && video.paused) attemptPlay(video);
+    if (payload.paused && !video.paused) {
+      suppressEcho();
+      video.pause();
+    }
   });
 
   /* ------------------------------------------------------------------ */

@@ -9,7 +9,8 @@
         "start": "node dist/server.js",
         "test": "vitest run",
         "test:watch": "vitest",
-        "verify:realtime": "ts-node --transpile-only scripts/verify-realtime.ts"
+        "verify:realtime": "ts-node --transpile-only scripts/verify-realtime.ts",
+        "verify:peers": "ts-node --transpile-only scripts/verify-peer-identity.ts"
     },
     "keywords": [
         "connectus",
