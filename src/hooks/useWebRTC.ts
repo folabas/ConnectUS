@@ -1,13 +1,25 @@
 'use client';
 
 /**
- * Peer-to-peer video/audio for everyone in the room.
+ * Peer-to-peer video and audio for everyone in the room.
  *
- * Rewritten against the authenticated socket. Behaviour preserved from the
- * previous implementation: perfect-negotiation-lite (the existing occupant
- * initiates toward each new arrival), an ICE candidate queue for candidates that
- * land before the remote description, and graceful degradation when the user
- * denies camera access.
+ * Two properties matter and both were broken:
+ *
+ * 1. **A connection carries the tracks it had when it was created.** Local
+ *    tracks are attached in `createConnection` and never afterwards, while
+ *    `getUserMedia` is asynchronous. Negotiating before the camera resolved
+ *    produced a connection with nothing on it — ICE succeeded, no error
+ *    appeared, and both sides sat looking at a black tile. Signalling that
+ *    arrives early is therefore queued and replayed once media settles.
+ *
+ * 2. **Exactly one side of a pair may offer.** Whoever arrives later offers to
+ *    everyone already present; occupants wait and answer. Both sides offering
+ *    produces glare — two offers crossing, leaving the connection in a
+ *    signalling state neither can recover from.
+ *
+ * Also here: an ICE candidate queue for candidates that arrive before the
+ * remote description, and graceful degradation when the camera is refused —
+ * that user still receives everyone else's media.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,6 +30,17 @@ export interface Peer {
   userId: string;
   socketId: string;
   stream: MediaStream;
+}
+
+interface PeerAddress {
+  socketId: string;
+  userId: string;
+}
+
+interface PendingOffer {
+  senderSocketId: string;
+  senderUserId: string;
+  sdp: RTCSessionDescriptionInit;
 }
 
 /**
@@ -44,15 +67,29 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
   const [mediaError, setMediaError] = useState<MediaError>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
+  const [relayAvailable, setRelayAvailable] = useState(true);
+
+  /**
+   * True once getUserMedia has *settled* — granted, refused, or unavailable.
+   *
+   * Refusal counts as settled: that user contributes nothing but should still
+   * receive everyone else, and holding the room open waiting for a permission
+   * prompt nobody is going to answer helps no one.
+   */
+  const [mediaSettled, setMediaSettled] = useState(false);
 
   const connections = useRef<Record<string, RTCPeerConnection>>({});
   const candidateQueue = useRef<Record<string, RTCIceCandidateInit[]>>({});
   const localStreamRef = useRef<MediaStream | null>(null);
 
+  // Signalling that arrived before media settled, replayed once it has.
+  const mediaSettledRef = useRef(false);
+  const pendingPeers = useRef<Map<string, PeerAddress>>(new Map());
+  const pendingOffers = useRef<Map<string, PendingOffer>>(new Map());
+
   // Held in a ref so a late-arriving config is picked up by connections created
   // after it, without re-running the signalling effect and tearing down peers.
   const iceConfig = useRef<RTCConfiguration>(FALLBACK_ICE);
-  const [relayAvailable, setRelayAvailable] = useState(true);
 
   /* ---------------------------------------------------------------------- */
   /* ICE configuration                                                      */
@@ -88,9 +125,16 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
 
     let cancelled = false;
 
+    const settle = () => {
+      if (cancelled) return;
+      mediaSettledRef.current = true;
+      setMediaSettled(true);
+    };
+
     const acquire = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         setMediaError('unsupported');
+        settle();
         return;
       }
       try {
@@ -109,8 +153,10 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
         if (cancelled) return;
         const name = (error as DOMException)?.name;
         // A refused camera must not break the watch party — the user still gets
-        // the film, chat and reactions.
+        // the film, chat, reactions, and everyone else's video.
         setMediaError(name === 'NotFoundError' ? 'not-found' : 'denied');
+      } finally {
+        settle();
       }
     };
 
@@ -121,6 +167,8 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       localStreamRef.current?.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
       setLocalStream(null);
+      mediaSettledRef.current = false;
+      setMediaSettled(false);
     };
   }, [enabled]);
 
@@ -132,6 +180,8 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     connections.current[socketId]?.close();
     delete connections.current[socketId];
     delete candidateQueue.current[socketId];
+    pendingPeers.current.delete(socketId);
+    pendingOffers.current.delete(socketId);
     setPeers((current) => current.filter((peer) => peer.socketId !== socketId));
   }, []);
 
@@ -190,44 +240,43 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     delete candidateQueue.current[socketId];
   }, []);
 
-  useEffect(() => {
-    if (!socket || !connected || !enabled || !roomId) return;
+  /** Offer to a peer, or queue them if we have nothing to offer yet. */
+  const offerTo = useCallback(
+    async (peer: PeerAddress) => {
+      if (!socket || connections.current[peer.socketId]) return;
 
-    const handleExisting = async (existing: { userId: string; socketId: string }[]) => {
-      // We are the newcomer: wait to be offered to, so both sides do not offer
-      // simultaneously. Peers are created lazily when their offer arrives.
-      void existing;
-    };
+      if (!mediaSettledRef.current) {
+        pendingPeers.current.set(peer.socketId, peer);
+        return;
+      }
 
-    const handleUserConnected = async ({
-      socketId,
-      userId,
-    }: {
-      socketId: string;
-      userId: string;
-    }) => {
-      const pc = createConnection(socketId, userId);
+      const pc = createConnection(peer.socketId, peer.userId);
       try {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        socket.emit('offer', { targetSocketId: socketId, sdp: offer });
+        socket.emit('offer', { targetSocketId: peer.socketId, sdp: offer });
       } catch {
-        closePeer(socketId);
+        closePeer(peer.socketId);
       }
-    };
+    },
+    [socket, createConnection, closePeer],
+  );
 
-    const handleOffer = async ({
-      senderSocketId,
-      senderUserId,
-      sdp,
-    }: {
-      senderSocketId: string;
-      senderUserId: string;
-      sdp: RTCSessionDescriptionInit;
-    }) => {
-      // Was `createConnection(senderSocketId, 'peer')` — a placeholder string.
-      // ParticipantStrip looks streams up by user id, so nothing ever matched
-      // and every remote peer rendered as "camera off" on the receiving side.
+  /** Answer an offer, or queue it if we have nothing to answer with yet. */
+  const answerOffer = useCallback(
+    async ({ senderSocketId, senderUserId, sdp }: PendingOffer) => {
+      if (!socket) return;
+
+      if (!mediaSettledRef.current) {
+        // Answering now would attach no local tracks, so the offerer would see
+        // and hear nothing from us for the life of the connection.
+        pendingOffers.current.set(senderSocketId, { senderSocketId, senderUserId, sdp });
+        return;
+      }
+
+      // senderUserId used to be the placeholder string 'peer'. ParticipantStrip
+      // looks streams up by user id, so nothing matched and every remote peer
+      // rendered as "camera off" on the receiving side.
       const pc = createConnection(senderSocketId, senderUserId);
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -238,7 +287,45 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       } catch {
         closePeer(senderSocketId);
       }
+    },
+    [socket, createConnection, closePeer, drainCandidates],
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* Replay whatever arrived before the camera was ready                    */
+  /* ---------------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!mediaSettled) return;
+
+    const peersToOffer = Array.from(pendingPeers.current.values());
+    pendingPeers.current.clear();
+    peersToOffer.forEach((peer) => void offerTo(peer));
+
+    const offersToAnswer = Array.from(pendingOffers.current.values());
+    pendingOffers.current.clear();
+    offersToAnswer.forEach((offer) => void answerOffer(offer));
+  }, [mediaSettled, offerTo, answerOffer]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Signalling                                                             */
+  /* ---------------------------------------------------------------------- */
+
+  useEffect(() => {
+    if (!socket || !connected || !enabled || !roomId) return;
+
+    // The newcomer offers to everyone already in the room; occupants wait and
+    // answer. Exactly one side initiates per pair, which is what keeps offers
+    // from crossing.
+    const handleExisting = (existing: PeerAddress[]) => {
+      existing.forEach((peer) => void offerTo(peer));
     };
+
+    // Someone arrived after us. They will offer; we only need to be ready to
+    // answer, which the offer handler already is.
+    const handleUserConnected = () => {};
+
+    const handleOffer = (payload: PendingOffer) => void answerOffer(payload);
 
     const handleAnswer = async ({
       senderSocketId,
@@ -293,16 +380,22 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
       socket.off('ice-candidate', handleCandidate);
       socket.off('user-disconnected', handleDisconnected);
     };
-  }, [socket, connected, enabled, roomId, createConnection, closePeer, drainCandidates]);
+  }, [socket, connected, enabled, roomId, offerTo, answerOffer, closePeer, drainCandidates]);
 
   // Tear every connection down when the room or the feature is switched off.
   useEffect(() => {
+    // Captured now so the cleanup closes the connections this run opened,
+    // rather than whatever happens to be current when it fires.
+    const open = connections.current;
+    const queuedPeers = pendingPeers.current;
+    const queuedOffers = pendingOffers.current;
+
     return () => {
-      Object.keys(connections.current).forEach((socketId) => {
-        connections.current[socketId]?.close();
-      });
+      Object.keys(open).forEach((socketId) => open[socketId]?.close());
       connections.current = {};
       candidateQueue.current = {};
+      queuedPeers.clear();
+      queuedOffers.clear();
       setPeers([]);
     };
   }, [roomId, enabled]);
@@ -335,5 +428,7 @@ export function useWebRTC(roomId: string | null, enabled: boolean) {
     toggleVideo,
     /** False when no TURN relay is available, so some peers may not connect. */
     relayAvailable,
+    /** False while the camera permission prompt is still outstanding. */
+    mediaSettled,
   };
 }

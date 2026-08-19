@@ -49,7 +49,7 @@ interface RoomContextValue {
   reject(userId: string): Promise<void>;
   start(): Promise<void>;
   end(): Promise<void>;
-  leave(): Promise<void>;
+  leave(transferTo?: string): Promise<void>;
 }
 
 const RoomContext = createContext<RoomContextValue | null>(null);
@@ -223,14 +223,20 @@ export function RoomProvider({
     }
   }, [roomId, router]);
 
-  const leave = useCallback(async () => {
-    try {
-      await roomApi.leave(roomId);
-    } catch {
-      // Leaving is best-effort; the socket disconnect cleans up regardless.
-    }
-    router.push('/library');
-  }, [roomId, router]);
+  const leave = useCallback(
+    async (transferTo?: string) => {
+      try {
+        await roomApi.leave(roomId, transferTo);
+      } catch (err) {
+        // A host who has not named a successor must not be quietly dropped out
+        // of a room they still own — surface it instead.
+        toast.error(errorMessage(err));
+        throw err;
+      }
+      router.push('/library');
+    },
+    [roomId, router],
+  );
 
   /* ---------------------------------------------------------------------- */
   /* Live updates                                                           */
@@ -288,6 +294,19 @@ export function RoomProvider({
     if (payload.roomId !== roomId) return;
     setPhase('denied');
     setError(payload.message || 'The host declined your request to join.');
+  });
+
+  // The previous host handed over and left.
+  useSocketEvent('host-changed', (payload) => {
+    if (payload.roomId !== roomId) return;
+    setRoom((current) => (current ? { ...current, host: payload.host } : current));
+
+    const inherited = payload.host?._id === userIdRef.current;
+    toast.info(
+      inherited
+        ? 'You are the host now — the room is yours.'
+        : `${payload.host?.fullName ?? 'Someone else'} is hosting now.`,
+    );
   });
 
   useSocketEvent('server-error', (payload) => {

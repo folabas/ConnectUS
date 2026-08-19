@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { RoomChat } from '@/components/room/RoomChat';
 import { RoomCodeBadge } from '@/components/room/RoomCodeBadge';
 import { PendingRequests } from '@/components/room/PendingRequests';
+import { HostLeaveDialog } from '@/components/room/HostLeaveDialog';
 import { ParticipantStrip } from '@/components/room/ParticipantStrip';
 import { ReactionBar, ReactionOverlay } from '@/components/room/Reactions';
 import { useRoom } from '@/providers/RoomProvider';
@@ -39,6 +40,7 @@ export default function WatchPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [panel, setPanel] = useState<Panel>('chat');
   const [blockedByAutoplay, setBlockedByAutoplay] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   // With host control off, anyone may drive playback.
   const canControl = isHost || room?.adminEnabled === false;
@@ -137,11 +139,11 @@ export default function WatchPage() {
 
           {isHost ? (
             <Button
-              onClick={() => void end()}
+              onClick={() => setLeaveOpen(true)}
               variant="outline"
               className="h-9 rounded-xl border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10"
             >
-              End session
+              Leave
             </Button>
           ) : (
             <Button
@@ -155,6 +157,16 @@ export default function WatchPage() {
           )}
         </div>
       </header>
+
+      {/* A host who walks out without handing over leaves a room nobody can
+          start, admit to, or end. */}
+      <HostLeaveDialog
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        others={room.participants.filter((p) => p._id !== user?.userId)}
+        onEndForEveryone={end}
+        onHandOver={(successorId) => leave(successorId)}
+      />
 
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* Stage */}

@@ -40,6 +40,12 @@ export interface ServerEvents {
   'room-updated': (payload: RoomUpdatedPayload) => void;
   'room-started': (payload: { roomId: string; room: Room }) => void;
   'room-ended': (payload: { roomId: string; message: string }) => void;
+  /** The host left and handed the room to someone still inside. */
+  'host-changed': (payload: {
+    roomId: string;
+    host: RoomMember;
+    previousHostId: string;
+  }) => void;
 
   'existing-participants': (peers: PeerPayload[]) => void;
   'user-connected': (peer: PeerPayload) => void;

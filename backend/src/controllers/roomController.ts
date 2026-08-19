@@ -298,11 +298,78 @@ export const leaveRoom = async (req: AuthRequest, res: Response): Promise<void> 
             return;
         }
 
-        // The host leaving would orphan the room; they end it instead.
+        // A host leaving without handing over would orphan the room: nobody
+        // could start it, admit anyone, or end it. They either end it for
+        // everyone or pass the remote to someone still inside.
         if (room.host.toString() === userId) {
-            res.status(400).json({
-                success: false,
-                message: 'As host, end the session instead of leaving it.',
+            const remaining = room.participants
+                .map((p) => p.toString())
+                .filter((id) => id !== userId);
+
+            if (remaining.length === 0) {
+                res.status(400).json({
+                    success: false,
+                    code: 'LAST_PERSON',
+                    message: 'You are the only one here — end the session instead.',
+                });
+                return;
+            }
+
+            const requested = typeof req.body?.transferTo === 'string' ? req.body.transferTo : null;
+
+            // With one person left there is no decision to make, so the client
+            // does not have to ask. With several, the host must name a successor
+            // rather than have one picked for them.
+            const successor = remaining.length === 1 ? remaining[0] : requested;
+
+            if (!successor) {
+                res.status(400).json({
+                    success: false,
+                    code: 'SUCCESSOR_REQUIRED',
+                    message: 'Choose who should take over as host.',
+                    data: { candidates: remaining },
+                });
+                return;
+            }
+
+            if (!remaining.includes(successor)) {
+                res.status(400).json({
+                    success: false,
+                    message: 'That person is not in the room.',
+                });
+                return;
+            }
+
+            await Room.updateOne(
+                { _id: id },
+                {
+                    $set: { host: new mongoose.Types.ObjectId(successor) },
+                    $pull: { participants: new mongoose.Types.ObjectId(userId) },
+                },
+            );
+
+            const handedOver = await populateRoom(id);
+            const io = req.app.get('io');
+            if (io && handedOver) {
+                io.to(id).emit('host-changed', {
+                    roomId: id,
+                    host: handedOver.host,
+                    previousHostId: userId,
+                });
+                io.to(id).emit('room-updated', {
+                    roomId: id,
+                    participantCount: handedOver.participants.length,
+                    participants: handedOver.participants,
+                    host: handedOver.host,
+                    movie: handedOver.movie,
+                    status: handedOver.status,
+                });
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Left the room and handed over hosting',
+                data: { host: handedOver?.host ?? null },
             });
             return;
         }

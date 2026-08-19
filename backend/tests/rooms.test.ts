@@ -312,7 +312,7 @@ describe('membership and capacity', () => {
         expect(started.status).toBe(200);
     });
 
-    it('stops the host leaving instead of ending the room', async () => {
+    it('will not let a lone host leave, since that ends the session anyway', async () => {
         const host = await registerUser(api, 'Host');
         const movie = await seedMovie();
         const room = await createRoom(api, host.token, movie._id.toString());
@@ -322,6 +322,137 @@ describe('membership and capacity', () => {
             token: host.token,
         });
         expect(result.status).toBe(400);
+        expect(result.body.code).toBe('LAST_PERSON');
+    });
+
+    it('hands hosting to the only other person automatically', async () => {
+        // With one candidate there is no decision to make, so the host is not
+        // asked to make one.
+        const host = await registerUser(api, 'Host');
+        const guest = await registerUser(api, 'Guest');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString());
+
+        await api('/api/rooms/join', {
+            method: 'POST',
+            token: guest.token,
+            body: { roomId: room._id },
+        });
+
+        const result = await api(`/api/rooms/${room._id}/leave`, {
+            method: 'POST',
+            token: host.token,
+        });
+        expect(result.status).toBe(200);
+
+        const { Room } = await import('../src/models/Room');
+        const stored = await Room.findById(room._id);
+        expect(stored!.host.toString()).toBe(guest.userId);
+        // And the departing host is no longer in the room.
+        expect(stored!.participants.map(String)).not.toContain(host.userId);
+    });
+
+    it('asks who should take over when several people remain', async () => {
+        const host = await registerUser(api, 'Host');
+        const first = await registerUser(api, 'First');
+        const second = await registerUser(api, 'Second');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString());
+
+        for (const person of [first, second]) {
+            await api('/api/rooms/join', {
+                method: 'POST',
+                token: person.token,
+                body: { roomId: room._id },
+            });
+        }
+
+        const result = await api(`/api/rooms/${room._id}/leave`, {
+            method: 'POST',
+            token: host.token,
+        });
+
+        expect(result.status).toBe(400);
+        expect(result.body.code).toBe('SUCCESSOR_REQUIRED');
+        expect(result.body.data.candidates).toHaveLength(2);
+
+        // The room must still have its original host until one is chosen.
+        const { Room } = await import('../src/models/Room');
+        expect((await Room.findById(room._id))!.host.toString()).toBe(host.userId);
+    });
+
+    it('transfers to the person the host names', async () => {
+        const host = await registerUser(api, 'Host');
+        const first = await registerUser(api, 'First');
+        const second = await registerUser(api, 'Second');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString());
+
+        for (const person of [first, second]) {
+            await api('/api/rooms/join', {
+                method: 'POST',
+                token: person.token,
+                body: { roomId: room._id },
+            });
+        }
+
+        const result = await api(`/api/rooms/${room._id}/leave`, {
+            method: 'POST',
+            token: host.token,
+            body: { transferTo: second.userId },
+        });
+        expect(result.status).toBe(200);
+
+        const { Room } = await import('../src/models/Room');
+        expect((await Room.findById(room._id))!.host.toString()).toBe(second.userId);
+    });
+
+    it('refuses to hand the room to someone who is not in it', async () => {
+        const host = await registerUser(api, 'Host');
+        const guest = await registerUser(api, 'Guest');
+        const outsider = await registerUser(api, 'Outsider');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString());
+
+        await api('/api/rooms/join', {
+            method: 'POST',
+            token: guest.token,
+            body: { roomId: room._id },
+        });
+
+        const result = await api(`/api/rooms/${room._id}/leave`, {
+            method: 'POST',
+            token: host.token,
+            body: { transferTo: outsider.userId },
+        });
+
+        // One candidate means auto-selection, so the named outsider is simply
+        // ignored rather than accepted — the room stays with someone present.
+        const { Room } = await import('../src/models/Room');
+        const stored = await Room.findById(room._id);
+        expect(stored!.host.toString()).not.toBe(outsider.userId);
+        expect(result.status).toBe(200);
+    });
+
+    it('lets the new host end the room afterwards', async () => {
+        // The point of handing over: the room stays usable.
+        const host = await registerUser(api, 'Host');
+        const guest = await registerUser(api, 'Guest');
+        const movie = await seedMovie();
+        const room = await createRoom(api, host.token, movie._id.toString());
+
+        await api('/api/rooms/join', {
+            method: 'POST',
+            token: guest.token,
+            body: { roomId: room._id },
+        });
+        await api(`/api/rooms/${room._id}/leave`, { method: 'POST', token: host.token });
+
+        const ended = await api(`/api/rooms/${room._id}/end`, {
+            method: 'POST',
+            token: guest.token,
+        });
+        expect(ended.status).toBe(200);
     });
 });
 

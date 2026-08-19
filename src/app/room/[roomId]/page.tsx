@@ -19,6 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { InviteFriends } from '@/components/room/InviteFriends';
 import { PendingRequests } from '@/components/room/PendingRequests';
+import { HostLeaveDialog } from '@/components/room/HostLeaveDialog';
 import { useRoom } from '@/providers/RoomProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { cn, focusRing, initials, surface } from '@/lib/ui';
@@ -29,6 +30,7 @@ export default function RoomLobbyPage() {
   const { room, phase, error, isHost, requestToJoin, start, end, leave } = useRoom();
 
   const [starting, setStarting] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   // A session already in progress belongs on the watch screen, not the lobby.
   useEffect(() => {
@@ -107,6 +109,14 @@ export default function RoomLobbyPage() {
       <div
         className="pointer-events-none fixed inset-x-0 top-0 h-96 opacity-20 blur-[100px]"
         style={{ background: `radial-gradient(circle at 50% 0%, ${theme.primary}, transparent 70%)` }}
+      />
+
+      <HostLeaveDialog
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        others={room.participants.filter((p) => p._id !== user?.userId)}
+        onEndForEveryone={end}
+        onHandOver={(successorId) => leave(successorId)}
       />
 
       <div className="relative mx-auto max-w-5xl px-4 py-8 sm:px-6">
@@ -244,11 +254,11 @@ export default function RoomLobbyPage() {
                     Everyone in the lobby moves to the film together.
                   </p>
                   <Button
-                    onClick={() => void end()}
+                    onClick={() => setLeaveOpen(true)}
                     variant="outline"
                     className="h-10 w-full rounded-xl border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10"
                   >
-                    End room
+                    Leave room
                   </Button>
                 </>
               ) : (

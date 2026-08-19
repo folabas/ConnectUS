@@ -391,8 +391,18 @@ export const roomApi = {
 
   end: (roomId: string) => request<void>(`/api/rooms/${roomId}/end`, { method: 'POST' }),
 
-  /** Leave a room without ending it. Hosts keep their seat; others are removed. */
-  leave: (roomId: string) => request<void>(`/api/rooms/${roomId}/leave`, { method: 'POST' }),
+  /**
+   * Leave without ending the session.
+   *
+   * A host must hand over: pass `transferTo`. With exactly one other person the
+   * server picks them, since there is no decision to make. With several and no
+   * successor named it returns SUCCESSOR_REQUIRED along with the candidates.
+   */
+  leave: (roomId: string, transferTo?: string) =>
+    request<{ host?: import('@/types').RoomMember } | void>(`/api/rooms/${roomId}/leave`, {
+      method: 'POST',
+      body: transferTo ? { transferTo } : undefined,
+    }),
 
   inviteByEmail: (roomId: string, emails: string[]) =>
     request<void>('/api/rooms/invite', { method: 'POST', body: { roomId, emails } }),

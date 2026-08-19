@@ -17,7 +17,7 @@ import { Clapperboard, Loader2, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { errorMessage, roomApi } from '@/lib/api';
-import { cn, focusRing, initials, surface } from '@/lib/ui';
+import { cn, focusRing, initials, STATUS_STYLES, surface } from '@/lib/ui';
 import type { WatchHistoryEntry } from '@/types';
 
 /** "14 March 2026" — unambiguous, and avoids locale-dependent day/month order. */
@@ -118,10 +118,30 @@ export function WatchHistory() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <p className="truncate font-medium">
                     {entry.movie?.title ?? 'Film unavailable'}
                   </p>
+
+                  {/* Whether the session is over decides what you can do with
+                      it, so it belongs beside the title rather than implied by
+                      the presence of a Rejoin link. */}
+                  {entry.status === 'finished' ? (
+                    <span className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/50">
+                      Ended
+                    </span>
+                  ) : (
+                    <span
+                      className={cn(
+                        'flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px]',
+                        (STATUS_STYLES[entry.status] ?? STATUS_STYLES.waiting).className,
+                      )}
+                    >
+                      <span className="h-1 w-1 rounded-full bg-current" />
+                      {(STATUS_STYLES[entry.status] ?? STATUS_STYLES.waiting).label}
+                    </span>
+                  )}
+
                   {entry.youHosted && (
                     <span className="rounded border border-[var(--brand)]/30 bg-[var(--brand)]/10 px-1.5 py-0.5 text-[10px] text-[var(--brand-soft)]">
                       You hosted
@@ -130,7 +150,8 @@ export function WatchHistory() {
                 </div>
 
                 <p className="mt-0.5 truncate text-sm text-white/50">
-                  {entry.name} · {formatDate(entry.watchedAt)}
+                  {entry.name} · {entry.status === 'finished' ? 'ended' : 'started'}{' '}
+                  {formatDate(entry.watchedAt)}
                 </p>
 
                 <div className="mt-2 flex items-center gap-2">
